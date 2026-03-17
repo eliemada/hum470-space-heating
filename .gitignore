@@ -1,0 +1,33 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/
+
+# Marimo session data
+notebooks/__marimo__/
+
+# Generated PDFs (recompile from .typ sources or rerun notebook)
+report.pdf
+eda_summary.pdf
+analysis_report.pdf
+
+# Reference materials (large binaries, not our work)
+Introduction-to-EGS2-T.pdf
+
+# Drafts / personal
+email_supervisor.txt
+
+# Editor / IDE
+*.swp
+*.swo
+*~
+.idea/
+.vscode/

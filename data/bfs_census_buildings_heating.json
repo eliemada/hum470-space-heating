@@ -1,0 +1,154 @@
+{
+  "columns": [
+    {
+      "code": "Kanton",
+      "text": "Kanton",
+      "type": "d"
+    },
+    {
+      "code": "Energieträger der Heizung",
+      "text": "Energieträger der Heizung",
+      "type": "d"
+    },
+    {
+      "code": "Jahr",
+      "text": "Jahr",
+      "type": "d"
+    },
+    {
+      "code": "Energiebereich: Gebäude",
+      "text": "Energiebereich: Gebäude",
+      "type": "c"
+    }
+  ],
+  "comments": [],
+  "data": [
+    {
+      "key": [
+        "00",
+        "1",
+        "1990"
+      ],
+      "values": [
+        "699464"
+      ]
+    },
+    {
+      "key": [
+        "00",
+        "1",
+        "2000"
+      ],
+      "values": [
+        "748771"
+      ]
+    },
+    {
+      "key": [
+        "00",
+        "2",
+        "1990"
+      ],
+      "values": [
+        "105529"
+      ]
+    },
+    {
+      "key": [
+        "00",
+        "2",
+        "2000"
+      ],
+      "values": [
+        "189202"
+      ]
+    },
+    {
+      "key": [
+        "00",
+        "3",
+        "1990"
+      ],
+      "values": [
+        "123652"
+      ]
+    },
+    {
+      "key": [
+        "00",
+        "3",
+        "2000"
+      ],
+      "values": [
+        "126791"
+      ]
+    },
+    {
+      "key": [
+        "00",
+        "4",
+        "1990"
+      ],
+      "values": [
+        "183255"
+      ]
+    },
+    {
+      "key": [
+        "00",
+        "4",
+        "2000"
+      ],
+      "values": [
+        "149677"
+      ]
+    },
+    {
+      "key": [
+        "00",
+        "5",
+        "1990"
+      ],
+      "values": [
+        "37938"
+      ]
+    },
+    {
+      "key": [
+        "00",
+        "5",
+        "2000"
+      ],
+      "values": [
+        "78357"
+      ]
+    },
+    {
+      "key": [
+        "00",
+        "9",
+        "1990"
+      ],
+      "values": [
+        "485"
+      ]
+    },
+    {
+      "key": [
+        "00",
+        "9",
+        "2000"
+      ],
+      "values": [
+        "2571"
+      ]
+    }
+  ],
+  "metadata": [
+    {
+      "updated": "2010-05-17T07:24:00Z",
+      "label": "Energiebereich: Gebäude nach Kanton, Energieträger der Heizung und Jahr",
+      "source": "BFS - Gebäude- und Wohnungserhebung (bis 2000) - © BFS"
+    }
+  ]
+}
