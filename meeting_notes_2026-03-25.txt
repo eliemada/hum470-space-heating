@@ -1,0 +1,33 @@
+HUM-470 Meeting Notes - 25 March 2026
+
+Attendees: 3/4 (Mark absent - lab celebration)
+
+---
+
+Status: Team paused since last meeting, waiting for feedback before diverging. Started drafting report sections. Supervisor noted the team is well advanced, ahead of the other group.
+
+Supervisor Feedback on Report:
+
+1. LMDI Decomposition - Can expand beyond 3 factors. Consider adding:
+   - Insulation rates (be careful with calculation methods - there are pitfalls)
+   - Building types (single household, multi-family, residential classes)
+
+2. Scope - Current scope is fine. Stay flexible: expand or reduce as needed, don't limit yourselves.
+
+3. Monte Carlo - Must calibrate against Energy Perspectives 2021 baseline. Pay attention to distribution types (triangular, uniform, etc.) - the shape of the range matters, not just the bounds. Justify chosen values (e.g., CO2 levy at 120/200 CHF/ton - why those numbers?).
+
+4. Population data - Extend historical data further back (1960s or earlier) to reveal interesting trends. Use official Swiss projections for future scenarios.
+
+5. Economics - Don't show only OPEX. Include annualized CAPEX (CAPEX / lifetime) to get TOTEX. Results will likely be similar but more rigorous.
+
+6. Building types (stretch goal) - A German team published a satellite-based global buildings database (open access). Using this for Switzerland to distinguish building types would push the report to "best report territory."
+
+7. Alternatives to heat pumps - For residential buildings where heat pumps can't fit, consider biofuels / sustainable petroleum products rather than hydrogen (not near-term realistic).
+
+8. Graphs - Presentation can be improved; will discuss in more detail later.
+
+Decisions:
+- Interim presentation preferred on April 22nd (team has midterms on April 15th). Supervisor will push for that date.
+- Remind supervisor next week about presentation dates + final exam date options.
+
+Next steps: Continue drafting report, expand population data range, refine Monte Carlo distributions, look into building type data.

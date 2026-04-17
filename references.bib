@@ -6,22 +6,27 @@
 % Or with page:  #cite(<ehrlich1971>, supplement: [p. 15])
 % =============================================================================
 
-% --- Foundational frameworks ---
+% ---------------------------------------------------------------------------
+% Foundational frameworks
+% ---------------------------------------------------------------------------
 
-@book{ehrlich1971,
-  author    = {Paul R. Ehrlich and John P. Holdren},
-  title     = {Impact of Population Growth},
-  year      = {1971},
-  publisher = {American Association for the Advancement of Science},
-  address   = {Washington, D.C.},
+@article{ehrlich1971,
+  author  = {Paul R. Ehrlich and John P. Holdren},
+  title   = {Impact of Population Growth},
+  journal = {Science},
+  year    = {1971},
+  volume  = {171},
+  number  = {3977},
+  pages   = {1212--1217},
+  doi     = {10.1126/science.171.3977.1212},
 }
 
-@article{kaya1990,
-  author  = {Yoichi Kaya},
-  title   = {Impact of Carbon Dioxide Emission Control on {GNP} Growth: Interpretation of Proposed Scenarios},
-  journal = {Paper presented to the IPCC Energy and Industry Subgroup, Response Strategies Working Group},
-  year    = {1990},
-  address = {Paris},
+@inproceedings{kaya1990,
+  author    = {Yoichi Kaya},
+  title     = {Impact of Carbon Dioxide Emission Control on {GNP} Growth: Interpretation of Proposed Scenarios},
+  booktitle = {IPCC Energy and Industry Subgroup, Response Strategies Working Group},
+  year      = {1990},
+  address   = {Paris},
 }
 
 @book{jackson2017,
@@ -43,7 +48,9 @@
   isbn      = {978-1931498586},
 }
 
-% --- Decomposition analysis methodology ---
+% ---------------------------------------------------------------------------
+% Decomposition analysis methodology
+% ---------------------------------------------------------------------------
 
 @article{ang2004,
   author  = {B.W. Ang},
@@ -87,7 +94,9 @@
   doi     = {10.1073/pnas.0700609104},
 }
 
-% --- Swiss institutional sources ---
+% ---------------------------------------------------------------------------
+% Swiss federal energy data (BFE / SFOE)
+% ---------------------------------------------------------------------------
 
 @report{bfe2024,
   author      = {{Bundesamt für Energie}},
@@ -95,21 +104,200 @@
   year        = {2024},
   institution = {BFE/SFOE},
   address     = {Bern},
+  note        = {Energy balance CSV: ogd115\_gest\_bilanz.csv; HDD monthly: ogd105\_heizgradtage.csv},
   url         = {https://www.bfe.admin.ch/bfe/de/home/versorgung/statistik-und-geodaten/energiestatistiken/gesamtenergiestatistik.html},
-  urldate     = {2026-02-28},
+  urldate     = {2026-03-20},
 }
+
+@report{bfe2024b,
+  author      = {{Bundesamt für Energie}},
+  title       = {CO2-Abgabe und Gebäudeprogramm: Faktenblatt 2024},
+  year        = {2024},
+  institution = {BFE/SFOE},
+  address     = {Bern},
+  url         = {https://www.bfe.admin.ch/bfe/de/home/politik/energiepolitik.html},
+  urldate     = {2026-03-20},
+}
+
+@report{prognos2024,
+  author      = {{Prognos AG} and {TEP Energy GmbH} and {Infras AG}},
+  title       = {Analyse des schweizerischen Energieverbrauchs 2000--2023 nach Verwendungszwecken},
+  year        = {2024},
+  institution = {Bundesamt für Energie},
+  address     = {Bern},
+  note        = {Tabelle 1 (space-heating share), Tabelle 11 (heating energy by carrier), Tabelle 13 (floor-area shares by heating system)},
+  url         = {https://www.bfe.admin.ch/bfe/de/home/versorgung/statistik-und-geodaten/energiestatistiken/energieverbrauch-nach-verwendungszweck.html},
+  urldate     = {2026-03-15},
+}
+
+% ---------------------------------------------------------------------------
+% Swiss federal statistics (BFS / FSO)
+% ---------------------------------------------------------------------------
 
 @report{bfs2024,
   author      = {{Bundesamt für Statistik}},
-  title       = {Gebäude- und Wohnungsstatistik},
+  title       = {Gebäude- und Wohnungsstatistik (GWS): Gebäude nach Heizsystem, Wohnfläche, Bauperiode},
   year        = {2024},
   institution = {BFS/FSO},
   address     = {Neuchâtel},
+  note        = {SDMX REST API dataflow DF\_GWS\_REG4; floor area by building category (asset 36158296); buildings by heating source 2000/2021 (asset 23524602)},
   url         = {https://www.bfs.admin.ch/bfs/de/home/statistiken/bau-wohnungswesen.html},
-  urldate     = {2026-02-28},
+  urldate     = {2026-03-20},
 }
 
-% --- International institutional sources ---
+@report{bfs2024pop,
+  author      = {{Bundesamt für Statistik}},
+  title       = {Ständige Wohnbevölkerung (STATPOP) und Szenarien zur Bevölkerungsentwicklung der Schweiz und der Kantone 2025--2075},
+  year        = {2024},
+  institution = {BFS/FSO},
+  address     = {Neuchâtel},
+  note        = {PX-Web API px-x-0102010000\_101; projection scenarios reference/high/low},
+  url         = {https://www.pxweb.bfs.admin.ch/},
+  urldate     = {2026-03-20},
+}
+
+% ---------------------------------------------------------------------------
+% Swiss building / climate policy
+% ---------------------------------------------------------------------------
+
+@report{muken2014,
+  author      = {{Konferenz Kantonaler Energiedirektoren}},
+  title       = {Mustervorschriften der Kantone im Energiebereich ({MuKEn} 2014)},
+  year        = {2015},
+  institution = {EnDK},
+  address     = {Bern},
+  note        = {Model energy prescriptions for cantons; adopted by 22/26 cantons as of 2025. Key provision: max.16 kWh/m²/yr for new buildings},
+  url         = {https://www.endk.ch/de/energiepolitik-der-kantone/muken},
+  urldate     = {2026-03-10},
+}
+
+@misc{co2act,
+  author      = {{Swiss Federal Council}},
+  title       = {Federal Act on the Reduction of {CO2} Emissions ({CO2} Act, {SR} 641.71)},
+  year        = {2024},
+  note        = {CO₂ levy on fossil heating fuels; CHF 120/t since 1 Jan 2022 (Ordinance SR 641.711, Art.94a). Revenue: 2/3 redistributed per capita, 1/3 to Buildings Programme},
+  url         = {https://www.fedlex.admin.ch/eli/cc/2012/855/en},
+  urldate     = {2026-03-20},
+}
+
+@report{gebprog2024,
+  author      = {{Bundesamt für Energie}},
+  title       = {Das Gebäudeprogramm: Jahresbericht 2023},
+  year        = {2024},
+  institution = {BFE/SFOE},
+  address     = {Bern},
+  note        = {Federal--cantonal subsidy programme for envelope retrofits and heating-system replacement. Funded by CO₂ levy revenues},
+  url         = {https://www.dasgebaeudeprogramm.ch},
+  urldate     = {2026-03-10},
+}
+
+@report{bafu2024,
+  author      = {{Bundesamt für Umwelt}},
+  title       = {{CO2}-Abgabe auf Brennstoffe: Wirkungsanalyse},
+  year        = {2024},
+  institution = {BAFU/FOEN},
+  address     = {Bern},
+  url         = {https://www.bafu.admin.ch/bafu/de/home/themen/klima/fachinformationen/verminderungsmassnahmen/co2-abgabe.html},
+  urldate     = {2026-03-20},
+}
+
+@report{ep2050plus,
+  author      = {{Prognos AG} and {TEP Energy GmbH} and {Infras AG} and {Ecoplan AG}},
+  title       = {Energieperspektiven 2050+ ({EP2050+})},
+  year        = {2020},
+  institution = {Bundesamt für Energie},
+  address     = {Bern},
+  note        = {Long-term energy scenarios consistent with net-zero 2050; requires building renovation rate of 2--2.5\%/yr},
+  url         = {https://www.bfe.admin.ch/bfe/de/home/politik/energieperspektiven-2050-plus.html},
+  urldate     = {2026-03-20},
+}
+
+% ---------------------------------------------------------------------------
+% Swiss building stock / renovation / insulation
+% ---------------------------------------------------------------------------
+
+@report{tep2023,
+  author      = {{TEP Energy GmbH}},
+  title       = {Erneuerungsraten und Energieeffizienz im Gebäudebestand: Synthesebericht},
+  year        = {2023},
+  institution = {Bundesamt für Energie},
+  address     = {Bern},
+  note        = {Annual energy-relevant renovation rate: ~1.1%; target: 2%/yr for 2050 compliance},
+  url         = {https://www.tep-energy.ch/en/projects/detail/p1601_Synthesebericht.php},
+  urldate     = {2026-03-20},
+}
+
+@article{kaempf2018,
+  author  = {Jérôme H. Kämpf and Jean-Louis Scartezzini},
+  title   = {Assessment of the Current Thermal Performance Level of the Swiss Residential Building Stock},
+  journal = {Energy and Buildings},
+  year    = {2018},
+  volume  = {178},
+  pages   = {242--254},
+  doi     = {10.1016/j.enbuild.2018.08.034},
+  note    = {U-values by building vintage from GEAK/CECB analysis: pre-1970 ~0.8--1.0 W/(m²K), post-2000 ~0.15--0.25 W/(m²K)},
+}
+
+@report{fws2024,
+  author      = {{Fachvereinigung Wärmepumpen Schweiz}},
+  title       = {Wärmepumpenstatistik 2023},
+  year        = {2024},
+  institution = {FWS},
+  address     = {Bern},
+  note        = {Seasonal COP 3--4 for air-source and ground-source HP in Swiss climate},
+  url         = {https://www.fws.ch/statistiken/},
+  urldate     = {2026-03-10},
+}
+
+@article{eubucco2023,
+  author  = {Nikola Milojevic-Dupont and Felix Wagner and Florian Nachtigall and Jiawei Hu and others},
+  title   = {{EUBUCCO} v0.1: European Building Stock Characteristics in a Common and Open Database},
+  journal = {Scientific Data},
+  year    = {2023},
+  volume  = {10},
+  pages   = {147},
+  doi     = {10.1038/s41597-023-02040-2},
+  note    = {2.6M Swiss building footprints but 0\% building type and 0\% construction year coverage --- only geometry + height from swisstopo},
+}
+
+% ---------------------------------------------------------------------------
+% Social cost of carbon / IPCC
+% ---------------------------------------------------------------------------
+
+@report{ipcc2023,
+  author      = {{Intergovernmental Panel on Climate Change}},
+  title       = {Climate Change 2023: Synthesis Report},
+  year        = {2023},
+  institution = {IPCC},
+  address     = {Geneva},
+  doi         = {10.59327/IPCC/AR6-9789291691647},
+}
+
+@article{rennert2022,
+  author  = {Kevin Rennert and Frank Errickson and Brian C. Prest and Lisa Rennels and others},
+  title   = {Comprehensive Evidence Implies a Higher Social Cost of {CO2}},
+  journal = {Nature},
+  year    = {2022},
+  volume  = {610},
+  pages   = {687--692},
+  doi     = {10.1038/s41586-022-05224-9},
+  note    = {Social cost of carbon: USD 185/t CO₂ (2020 USD), supporting the CHF 300/t scenario},
+}
+
+@report{epa2023,
+  author      = {{United States Environmental Protection Agency}},
+  title       = {Report on the Social Cost of Greenhouse Gases: Estimates Incorporating Recent Scientific Advances},
+  year        = {2023},
+  institution = {US EPA},
+  address     = {Washington, D.C.},
+  note        = {Central SCC estimate: USD 190/t CO₂ (2020 USD) at 2% discount rate},
+  url         = {https://www.epa.gov/environmental-economics/scghg},
+  urldate     = {2026-03-20},
+}
+
+% ---------------------------------------------------------------------------
+% International institutional sources
+% ---------------------------------------------------------------------------
 
 @report{iea2024,
   author      = {{International Energy Agency}},
@@ -121,25 +309,47 @@
   urldate     = {2026-02-28},
 }
 
-@report{ipcc2023,
-  author      = {{Intergovernmental Panel on Climate Change}},
-  title       = {Climate Change 2023: Synthesis Report},
-  year        = {2023},
-  institution = {IPCC},
-  address     = {Geneva},
-  doi         = {10.59327/IPCC/AR6-9789291691647},
-}
-
 @report{worldbank2024,
   author      = {{World Bank}},
-  title       = {World Development Indicators},
+  title       = {World Development Indicators: {GDP} (constant {LCU}) and Total Population --- Switzerland},
   year        = {2024},
   institution = {The World Bank Group},
+  note        = {GDP indicator NY.GDP.MKTP.KN; population indicator SP.POP.TOTL; accessed via REST API},
   url         = {https://databank.worldbank.org/source/world-development-indicators},
-  urldate     = {2026-02-28},
+  urldate     = {2026-03-20},
 }
 
-% --- Online sources ---
+% ---------------------------------------------------------------------------
+% Climate / HDD data
+% ---------------------------------------------------------------------------
+
+@report{meteoswiss2024,
+  author      = {{MeteoSwiss}},
+  title       = {Heating Degree Days for Swiss Reference Stations},
+  year        = {2024},
+  institution = {Federal Office of Meteorology and Climatology},
+  address     = {Zurich},
+  note        = {Zurich-Fluntern station data pre-1994 (Stadt Zürich Open Data, UMW103OD1031); BFE national population-weighted HDD 1994+},
+  url         = {https://www.meteoswiss.admin.ch},
+  urldate     = {2026-03-20},
+}
+
+% ---------------------------------------------------------------------------
+% Geospatial data
+% ---------------------------------------------------------------------------
+
+@misc{swissmaps2021,
+  author  = {{Interactive Things}},
+  title   = {swiss-maps: {TopoJSON} files for Swiss cantons, districts, and municipalities},
+  year    = {2021},
+  note    = {Based on BFS/GEOSTAT boundaries; 26 cantons with BFS canton IDs 1--26},
+  url     = {https://github.com/interactivethings/swiss-maps},
+  urldate = {2026-03-26},
+}
+
+% ---------------------------------------------------------------------------
+% Online / supplementary sources
+% ---------------------------------------------------------------------------
 
 @online{owid2024,
   author  = {Hannah Ritchie and Max Roser and Pablo Rosado},
@@ -149,18 +359,138 @@
   urldate = {2026-02-28},
 }
 
-% =============================================================================
-% Add your own references below
-% =============================================================================
-% Suggested references to find and add:
-%
-% - Swiss building energy: Prognos studies, SFOE ex-post analyses
-% - MuKEn / cantonal energy regulations
-% - Swiss CO2 Act (CO2-Gesetz)
-% - The Building Programme (Gebäudeprogramm)
-% - Energy Strategy 2050
-% - SIA 380/1 (Swiss norm for heating energy demand)
-% - Heat pump market data (FWS / Wärmepumpen-Statistik)
-% - European building energy decomposition studies
-% - EKC literature for buildings/heating
+@misc{sdmx2024,
+  author  = {{Swiss Federal Statistical Office}},
+  title   = {{SDMX} {REST} {API} --- Dataflow {DF\_GWS\_REG4}: Buildings by Category, Heating System, Canton},
+  year    = {2024},
+  note    = {Canton-level building data: heating source x building type x year x canton, 2021--2024},
+  url     = {https://disseminate.stats.swiss/},
+  urldate = {2026-03-26},
+}
+
+% ---------------------------------------------------------------------------
+% Environmental Kuznets Curve and decoupling
+% ---------------------------------------------------------------------------
+
+@article{grossman1995,
+  author  = {Gene M. Grossman and Alan B. Krueger},
+  title   = {Economic Growth and the Environment},
+  journal = {The Quarterly Journal of Economics},
+  year    = {1995},
+  volume  = {110},
+  number  = {2},
+  pages   = {353--377},
+  doi     = {10.2307/2118443},
+}
+
+@article{stern2004,
+  author  = {David I. Stern},
+  title   = {The Rise and Fall of the Environmental Kuznets Curve},
+  journal = {World Development},
+  year    = {2004},
+  volume  = {32},
+  number  = {8},
+  pages   = {1419--1439},
+  doi     = {10.1016/j.worlddev.2004.05.004},
+}
+
+@article{dinda2004,
+  author  = {Soumyananda Dinda},
+  title   = {Environmental Kuznets Curve Hypothesis: A Survey},
+  journal = {Ecological Economics},
+  year    = {2004},
+  volume  = {49},
+  number  = {4},
+  pages   = {431--455},
+  doi     = {10.1016/j.ecolecon.2004.02.011},
+}
+
+@article{pablo2017,
+  author  = {Pablo-Romero, María del P. and De Jesús, Josué},
+  title   = {Economic Growth and Energy Consumption: The {Energy-Environmental Kuznets Curve} for {Latin America} and the {Caribbean}},
+  journal = {Renewable and Sustainable Energy Reviews},
+  year    = {2016},
+  volume  = {60},
+  pages   = {1343--1350},
+  doi     = {10.1016/j.rser.2016.03.029},
+}
+
+% ---------------------------------------------------------------------------
+% Building energy literature
+% ---------------------------------------------------------------------------
+
+@incollection{lucon2014,
+  author    = {Oswaldo Lucon and Diana Ürge-Vorsatz and Azni Zain Ahmed and Hashem Akbari and others},
+  title     = {Buildings},
+  booktitle = {Climate Change 2014: Mitigation of Climate Change. Contribution of Working Group {III} to the Fifth Assessment Report of the {IPCC}},
+  year      = {2014},
+  editor    = {Ottmar Edenhofer and others},
+  publisher = {Cambridge University Press},
+  address   = {Cambridge},
+  chapter   = {9},
+  pages     = {671--738},
+}
+
+@article{urgevorsatz2015,
+  author  = {Diana Ürge-Vorsatz and Luisa F. Cabeza and Susana Serrano and Camila Barreneche and Ksenia Petrichenko},
+  title   = {Heating and Cooling Energy Trends and Drivers in Buildings},
+  journal = {Renewable and Sustainable Energy Reviews},
+  year    = {2015},
+  volume  = {41},
+  pages   = {85--98},
+  doi     = {10.1016/j.rser.2014.08.039},
+}
+
+@report{iea2024buildings,
+  author      = {{International Energy Agency}},
+  title       = {Tracking Buildings 2024},
+  year        = {2024},
+  institution = {IEA},
+  address     = {Paris},
+  url         = {https://www.iea.org/energy-system/buildings},
+  urldate     = {2026-03-20},
+}
+
+@report{odyssee2023,
+  author      = {{Odyssee-Mure}},
+  title       = {Energy Efficiency Trends and Policies in the Household Sector in the {EU}},
+  year        = {2023},
+  institution = {Odyssee-Mure Project, Enerdata / ADEME},
+  address     = {Grenoble},
+  url         = {https://www.odyssee-mure.eu},
+  urldate     = {2026-03-15},
+}
+
+@article{reuter2020,
+  author  = {Matthias Reuter and Martin K. Patel and Wolfgang Eichhammer},
+  title   = {Applying Ex Post Index Decomposition Analysis to Final Energy Consumption for Evaluating {European} Energy Efficiency Policies and Targets},
+  journal = {Energy Efficiency},
+  year    = {2019},
+  volume  = {12},
+  pages   = {1329--1357},
+  doi     = {10.1007/s12053-018-09772-y},
+}
+
+@article{cayla2011,
+  author  = {Jean-Michel Cayla and Nadia Maïzi and Christophe Marchand},
+  title   = {The Role of Income in Energy Consumption Behaviour: Evidence from {French} Households Data},
+  journal = {Energy Policy},
+  year    = {2011},
+  volume  = {39},
+  number  = {12},
+  pages   = {7874--7883},
+  doi     = {10.1016/j.enpol.2011.09.036},
+}
+
+@article{sorrell2009,
+  author  = {Steve Sorrell and John Dimitropoulos and Matt Sommerville},
+  title   = {Empirical Estimates of the Direct Rebound Effect: A Review},
+  journal = {Energy Policy},
+  year    = {2009},
+  volume  = {37},
+  number  = {4},
+  pages   = {1356--1371},
+  doi     = {10.1016/j.enpol.2008.11.026},
+}
+
 % =============================================================================

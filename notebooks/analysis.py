@@ -4,10 +4,12 @@
 #     "marimo",
 #     "polars",
 #     "plotly",
+#     "kaleido",
 #     "httpx",
 #     "openpyxl",
 #     "pyarrow",
 #     "numpy",
+#     "pandas",
 # ]
 # ///
 
@@ -47,86 +49,157 @@ def _(mo):
 @app.cell
 def _():
     import polars as pl
-    import plotly.express as px
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
-    import httpx
     from pathlib import Path
     import json
 
-    # Resolve project root from this file's path (works in both run and edit mode)
+    # Resolve project root
     _app_path = Path(__file__).resolve()
     _PROJECT_DIR = _app_path.parent.parent if _app_path.parent.name == "notebooks" else _app_path.parent
     DATA_DIR = _PROJECT_DIR / "data"
     DATA_DIR.mkdir(exist_ok=True)
     RAW_DIR = DATA_DIR / "raw"
     RAW_DIR.mkdir(exist_ok=True)
+    FIGURES_DIR = _PROJECT_DIR / "figures"
+    FIGURES_DIR.mkdir(exist_ok=True)
 
-    def download_cached(url: str, filename: str, *, force: bool = False) -> Path:
-        """Download a file if not already cached in data/."""
-        path = DATA_DIR / filename
-        if path.exists() and not force:
-            print(f"  [cached] {filename}")
-            return path
-        print(f"  [downloading] {filename} ...")
-        resp = httpx.get(url, follow_redirects=True, timeout=60.0)
-        resp.raise_for_status()
-        path.write_bytes(resp.content)
-        print(f"  [saved] {filename} ({len(resp.content) / 1024:.0f} KB)")
-        return path
+    # Import lib modules
+    from lib.data_sources import (
+        download_file,
+        download_json,
+        download_sdmx_csv,
+        load_household_energy,
+        load_sh_share,
+        get_sh_share_fn,
+        load_heating_mix,
+        load_heating_energy,
+        load_hdd,
+        load_population,
+        load_gdp,
+        load_floor_area,
+        load_floor_area_by_period,
+        load_buildings_heating,
+        load_gwr_heating_by_type,
+        topojson_to_geojson_cantons,
+        load_gwr_canton_hp_share,
+    )
+    import plotly.express as px
+    from lib.chart_style import (
+        apply_theme,
+        export_fig,
+        CARRIER_MAP,
+        CARRIER_COLORS,
+        MIX_COLORS,
+        MIX_LABELS,
+        MIX_CARRIERS,
+        BUILDING_HEAT_COLORS,
+        BUILDING_TYPE_COLORS,
+        SYSTEM_COLORS,
+        LMDI_COLORS,
+        DECOUPLE_SERIES,
+    )
+    from lib.lmdi import compute_lmdi_3factor, compute_lmdi_4factor, verify_decomposition
+    from lib.monte_carlo import (
+        run_monte_carlo,
+        compute_named_trajectories,
+        compute_tornado_sensitivity,
+        extract_base_values,
+        DEFAULT_SCENARIOS,
+    )
+    from lib.economics import (
+        compute_opex,
+        compute_totex,
+        DEFAULT_SYSTEMS,
+        CO2_LEVY_SCENARIOS,
+        annuity_factor,
+    )
 
-    def download_json_api(url: str, filename: str, *, payload: dict | None = None, force: bool = False) -> Path:
-        """Download JSON from a REST API, cache locally."""
-        path = DATA_DIR / filename
-        if path.exists() and not force:
-            print(f"  [cached] {filename}")
-            return path
-        print(f"  [downloading] {filename} ...")
-        if payload:
-            resp = httpx.post(url, json=payload, follow_redirects=True, timeout=30.0)
-        else:
-            resp = httpx.get(url, follow_redirects=True, timeout=30.0)
-        resp.raise_for_status()
-        path.write_text(json.dumps(resp.json(), indent=2, ensure_ascii=False))
-        print(f"  [saved] {filename} ({len(resp.content) / 1024:.0f} KB)")
-        return path
-
-    print("Utilities ready.")
+    print("Setup complete — lib modules loaded.")
     return (
+        BUILDING_HEAT_COLORS,
+        BUILDING_TYPE_COLORS,
+        CARRIER_COLORS,
+        CARRIER_MAP,
+        CO2_LEVY_SCENARIOS,
+        DATA_DIR,
+        DECOUPLE_SERIES,
+        DEFAULT_SCENARIOS,
+        DEFAULT_SYSTEMS,
+        FIGURES_DIR,
+        LMDI_COLORS,
+        MIX_CARRIERS,
+        MIX_COLORS,
+        MIX_LABELS,
         RAW_DIR,
-        download_cached,
-        download_json_api,
+        SYSTEM_COLORS,
+        annuity_factor,
+        apply_theme,
+        compute_lmdi_3factor,
+        compute_lmdi_4factor,
+        compute_named_trajectories,
+        compute_opex,
+        compute_tornado_sensitivity,
+        compute_totex,
+        download_file,
+        download_json,
+        download_sdmx_csv,
+        export_fig,
+        extract_base_values,
+        get_sh_share_fn,
         go,
         json,
+        load_buildings_heating,
+        load_floor_area,
+        load_floor_area_by_period,
+        load_gdp,
+        load_gwr_heating_by_type,
+        load_hdd,
+        load_heating_energy,
+        load_heating_mix,
+        load_household_energy,
+        load_population,
+        load_sh_share,
         make_subplots,
         pl,
+        run_monte_carlo,
+        verify_decomposition,
     )
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# DATA DOWNLOAD
+# ═══════════════════════════════════════════════════════════════════════
+
+
 @app.cell
-def _(download_cached, download_json_api, mo):
+def _(DATA_DIR, RAW_DIR, download_file, download_json, download_sdmx_csv, mo):
     mo.md("### Downloading datasets...")
 
-    # 1. BFE Energy Balance (CSV from opendata.swiss — verified working URL)
-    energy_balance_path = download_cached(
+    # 1. BFE Energy Balance
+    energy_balance_path = download_file(
+        DATA_DIR,
         "https://www.uvek-gis.admin.ch/BFE/ogd/115/ogd115_gest_bilanz.csv",
         "bfe_energy_balance.csv",
     )
 
-    # 2. BFE official HDD — population-weighted, base 20/12°C (monthly, 1994-present)
-    hdd_path = download_cached(
+    # 2. BFE official HDD (monthly, 1994+)
+    hdd_path = download_file(
+        DATA_DIR,
         "https://www.uvek-gis.admin.ch/BFE/ogd/105/ogd105_heizgradtage.csv",
         "bfe_hdd_monthly.csv",
     )
 
-    # 2b. Zurich Fluntern HDD (1864-present) — for pre-1994 coverage
-    hdd_zurich_path = download_cached(
+    # 2b. Zurich Fluntern HDD (1864+)
+    hdd_zurich_path = download_file(
+        DATA_DIR,
         "https://data.stadt-zuerich.ch/dataset/umw_heizgradtage_standort_jahr_monat_od1031/download/UMW103OD1031.csv",
         "zurich_hdd_annual.csv",
     )
 
-    # 3. BFS Population (PX-Web REST API — total Swiss population 2010-2024)
-    pop_path = download_json_api(
+    # 3. BFS Population (PX-Web, 2010-2024)
+    pop_path = download_json(
+        DATA_DIR,
         "https://www.pxweb.bfs.admin.ch/api/v1/en/px-x-0102010000_101/px-x-0102010000_101.px",
         "bfs_population.json",
         payload={
@@ -141,8 +214,55 @@ def _(download_cached, download_json_api, mo):
         },
     )
 
+    # 4. BFE/Prognos household energy by end use
+    download_file(RAW_DIR, "https://pubdb.bfe.admin.ch/de/publication/download/12388", "bfe_hh_energy_by_use_2024.xlsx")
+
+    # 5. BFS floor area per person
+    download_file(RAW_DIR, "https://dam-api.bfs.admin.ch/hub/api/dam/assets/36158296/master", "floor_area_by_building_category.xlsx")
+
+    # 6. BFS floor area by rooms and canton
+    download_file(RAW_DIR, "https://dam-api.bfs.admin.ch/hub/api/dam/assets/36158430/master", "floor_area_by_rooms_canton.csv")
+
+    # 7. BFS buildings by heating system (2000 vs 2021)
+    download_file(RAW_DIR, "https://dam-api.bfs.admin.ch/hub/api/dam/assets/23524602/master", "buildings_heating_source_2000_2021.xlsx")
+
+    # 8. BFS construction & housing summary
+    download_file(RAW_DIR, "https://dam-api.bfs.admin.ch/hub/api/dam/assets/24885538/master", "bau_wohnungswesen.csv")
+
+    # 9. World Bank GDP (constant LCU, 2000-2024)
+    download_json(RAW_DIR, "https://api.worldbank.org/v2/country/CHE/indicator/NY.GDP.MKTP.KN?format=json&per_page=50&date=2000:2024", "worldbank_gdp_ch.json")
+
+    # 10. World Bank population (1960-2024, extended for historical context)
+    download_json(RAW_DIR, "https://api.worldbank.org/v2/country/CHE/indicator/SP.POP.TOTL?format=json&per_page=100&date=1960:2024", "worldbank_pop_ch.json")
+
+    # 11. GWR Buildings by type × heating source (SDMX, 2021-2024)
+    gwr_heating_path = download_sdmx_csv(
+        DATA_DIR,
+        "https://disseminate.stats.swiss/rest/data/CH1.GWS,DF_GWS_REG4,1.0.0/A._T..._T.8100?dimensionAtObservation=AllDimensions",
+        "gwr_heating_by_type.csv",
+    )
+
+    # 12. Swiss cantons TopoJSON (interactivethings/swiss-maps v4)
+    canton_topo_path = download_file(
+        RAW_DIR,
+        "https://unpkg.com/swiss-maps@4/2021/ch-combined.json",
+        "ch_combined_topo.json",
+    )
+
+    # 13. GWR heating by canton (all cantons, all building types, heating source)
+    gwr_canton_path = download_sdmx_csv(
+        DATA_DIR,
+        "https://disseminate.stats.swiss/rest/data/CH1.GWS,DF_GWS_REG4,1.0.0/A._T._T.._T.?dimensionAtObservation=AllDimensions",
+        "gwr_heating_by_canton.csv",
+    )
+
     mo.md("**All datasets downloaded / cached.**")
-    return energy_balance_path, hdd_path, hdd_zurich_path, pop_path
+    return canton_topo_path, energy_balance_path, gwr_canton_path, gwr_heating_path, hdd_path, hdd_zurich_path, pop_path
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 1. HOUSEHOLD ENERGY BALANCE
+# ═══════════════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -161,23 +281,8 @@ def _(mo):
 
 
 @app.cell
-def _(energy_balance_path, pl):
-    # Load the BFE energy balance
-    df_energy_raw = pl.read_csv(energy_balance_path, separator=",", infer_schema_length=10000)
-
-    # Cast TJ column to float (it may contain string values)
-    df_energy = df_energy_raw.with_columns(
-        pl.col("TJ").cast(pl.Float64, strict=False)
-    )
-
-    # Filter for household final consumption
-    df_hh = (
-        df_energy
-        .filter(pl.col("Rubrik") == "Endverbrauch - Haushalte")
-        .filter(pl.col("TJ").is_not_null())
-        .sort("Jahr", "Energietraeger")
-    )
-
+def _(energy_balance_path, load_household_energy):
+    df_hh = load_household_energy(energy_balance_path)
     print(f"Household energy data: {df_hh.shape[0]} rows, years {df_hh['Jahr'].min()}-{df_hh['Jahr'].max()}")
     print(f"Energy carriers: {df_hh['Energietraeger'].unique().sort().to_list()}")
     df_hh.head(15)
@@ -185,108 +290,41 @@ def _(energy_balance_path, pl):
 
 
 @app.cell
-def _(df_hh, go, pl):
-    # Map German energy carrier names to English for the chart
-    carrier_map = {
-        "Erdölprodukte": "Petroleum Products",
-        "Elektrizität": "Electricity",
-        "Gas": "Natural Gas",
-        "Holzenergie": "Wood / Biomass",
-        "Fernwärme": "District Heating",
-        "Kohle": "Coal",
-        "Uebrige erneuerbare Energien": "Other Renewables",
-        "Müll und Industrieabfälle": "Waste",
-    }
-    carrier_colors = {
-        "Petroleum Products": "#8B4513",
-        "Natural Gas": "#FF6B35",
-        "Electricity": "#FFC107",
-        "Wood / Biomass": "#4CAF50",
-        "District Heating": "#9C27B0",
-        "Other Renewables": "#00BCD4",
-        "Coal": "#607D8B",
-        "Waste": "#795548",
-    }
-
-    # Pivot for stacked area
+def _(CARRIER_COLORS, CARRIER_MAP, apply_theme, df_hh, go, pl):
+    # Stacked area — household energy by carrier
     df_hh_plot = df_hh.with_columns(
-        pl.col("Energietraeger").replace(carrier_map).alias("carrier_en")
+        pl.col("Energietraeger").replace(CARRIER_MAP).alias("carrier_en")
     )
-
-    # Group by year and carrier
     df_pivot = (
         df_hh_plot
         .group_by(["Jahr", "carrier_en"])
         .agg(pl.col("TJ").sum())
         .sort("Jahr")
     )
-
-    # Build stacked area chart
-    fig_hh_energy = go.Figure()
-    # Order carriers by total contribution (largest at bottom)
     carrier_totals = (
         df_pivot.group_by("carrier_en")
         .agg(pl.col("TJ").sum().alias("total"))
         .sort("total", descending=True)
     )
-    ordered_carriers = carrier_totals["carrier_en"].to_list()
 
-    for _carrier in ordered_carriers:
-        _subset = df_pivot.filter(pl.col("carrier_en") == _carrier).sort("Jahr")
+    fig_hh_energy = go.Figure()
+    for _carrier in carrier_totals["carrier_en"].to_list():
+        _sub = df_pivot.filter(pl.col("carrier_en") == _carrier).sort("Jahr")
         fig_hh_energy.add_trace(go.Scatter(
-            x=_subset["Jahr"].to_list(),
-            y=_subset["TJ"].to_list(),
+            x=_sub["Jahr"].to_list(),
+            y=_sub["TJ"].to_list(),
             name=_carrier,
             mode="lines",
             stackgroup="one",
-            line=dict(width=0.5, color=carrier_colors.get(_carrier, "#999")),
+            line=dict(width=0.5, color=CARRIER_COLORS.get(_carrier, "#999")),
         ))
 
-    fig_hh_energy.update_layout(
+    apply_theme(fig_hh_energy).update_layout(
         title="Swiss Household Final Energy Consumption by Carrier (TJ)",
         xaxis_title="Year",
         yaxis_title="Final Energy (TJ)",
-        template="plotly_white",
-        font=dict(size=14),
-        width=1000,
-        height=550,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
     )
     fig_hh_energy
-    return
-
-
-@app.cell
-def _(df_hh, go, pl):
-    # Total household energy over time (all carriers summed)
-    df_hh_total = (
-        df_hh
-        .group_by("Jahr")
-        .agg(pl.col("TJ").sum().alias("total_TJ"))
-        .sort("Jahr")
-    )
-
-    # Also compute total for all end-use sectors for comparison
-    fig_hh_total = go.Figure()
-    fig_hh_total.add_trace(go.Scatter(
-        x=df_hh_total["Jahr"].to_list(),
-        y=df_hh_total["total_TJ"].to_list(),
-        name="Household Total Energy",
-        mode="lines+markers",
-        line=dict(color="#2196F3", width=3),
-        marker=dict(size=5),
-    ))
-
-    fig_hh_total.update_layout(
-        title="Total Swiss Household Final Energy Consumption (TJ)",
-        xaxis_title="Year",
-        yaxis_title="Total Energy (TJ)",
-        template="plotly_white",
-        font=dict(size=14),
-        width=950,
-        height=500,
-    )
-    fig_hh_total
     return
 
 
@@ -302,6 +340,11 @@ def _(mo):
     - Total household energy peaked around **2010** and shows a clear **downward trend** since (~-10% vs 2000).
     """)
     return
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# SPACE-HEATING SHARE
+# ═══════════════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -324,39 +367,9 @@ def _(mo):
 
 
 @app.cell
-def _(RAW_DIR, pl):
-    # Space-heating (Raumwärme) energy directly from BFE/Prognos publication:
-    # "Der Energieverbrauch der Privaten Haushalte 2000–2024", Tabelle 1
-    # Source: pubdb.bfe.admin.ch/de/publication/download/12388 (Nov 2025)
-    # We read both Raumwärme (row 7) and Total (row 17) to compute the share.
-    import openpyxl as _openpyxl_sh
-
-    _wb_sh = _openpyxl_sh.load_workbook(
-        RAW_DIR / "bfe_hh_energy_by_use_2024.xlsx", data_only=True,
-    )
-    _ws_sh = _wb_sh["Tabelle1"]
-
-    _sh_records = []
-    for _c in range(3, 28):  # col 3 = 2000, col 27 = 2024
-        _yr = int(_ws_sh.cell(6, _c).value)
-        _rw_pj = float(_ws_sh.cell(7, _c).value)   # Raumwärme (PJ)
-        _tot_pj = float(_ws_sh.cell(17, _c).value)  # Total HH (PJ)
-        _sh_records.append({
-            "year": _yr,
-            "raumwaerme_pj": round(_rw_pj, 2),
-            "total_hh_pj": round(_tot_pj, 2),
-            "sh_share": round(_rw_pj / _tot_pj, 4),
-        })
-
-    df_sh_share = pl.DataFrame(_sh_records).sort("year")
-
-    def get_sh_share(year: int) -> float:
-        """Look up the exact space-heating share for a given year."""
-        _row = df_sh_share.filter(pl.col("year") == year)
-        if _row.shape[0] > 0:
-            return _row["sh_share"][0]
-        # Fallback: use nearest year
-        return df_sh_share.filter(pl.col("year") == df_sh_share["year"].max())["sh_share"][0]
+def _(RAW_DIR, get_sh_share_fn, load_sh_share):
+    df_sh_share = load_sh_share(RAW_DIR / "bfe_hh_energy_by_use_2024.xlsx")
+    get_sh_share = get_sh_share_fn(df_sh_share)
 
     print("Space-heating share loaded from BFE/Prognos Tabelle 1.")
     print(f"  SH share 2000: {get_sh_share(2000):.1%}")
@@ -364,6 +377,11 @@ def _(RAW_DIR, pl):
     print(f"  SH share 2024: {get_sh_share(2024):.1%}")
     df_sh_share
     return (get_sh_share,)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 2. HEATING DEGREE DAYS
+# ═══════════════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -382,71 +400,19 @@ def _(mo):
 
 
 @app.cell
-def _(hdd_path, hdd_zurich_path, pl):
-    # === BFE national population-weighted HDD (1994-present) ===
-    # Source: opendata.swiss — ogd105_heizgradtage.csv
-    # Monthly data, we sum to annual totals
-    df_hdd_monthly = (
-        pl.read_csv(hdd_path, separator=",", infer_schema_length=1000)
-        .filter(pl.col("Jahr").is_not_null())
-        .with_columns(
-            pl.col("Jahr").cast(pl.Int64),
-            pl.col("Heizgradtage").cast(pl.Float64, strict=False),
-        )
-        .filter(pl.col("Heizgradtage").is_not_null())
-    )
-
-    df_hdd_bfe = (
-        df_hdd_monthly
-        .group_by("Jahr")
-        .agg(pl.col("Heizgradtage").sum().round(1).alias("hdd"))
-        .rename({"Jahr": "year"})
-        .sort("year")
-    )
-
-    # === Zurich Fluntern HDD (1864-present) — for pre-1994 extension ===
-    # Filter for Fluntern station only, sum monthly "Heizgradtag" column
-    df_hdd_zurich = (
-        pl.read_csv(hdd_zurich_path, separator=",", encoding="utf8-lossy",
-                     infer_schema_length=5000)
-        .filter(pl.col("Standort") == "Fluntern")
-        .filter(pl.col("Heizgradtag").is_not_null())
-        .with_columns(
-            pl.col("Jahr").cast(pl.Int64),
-            pl.col("Heizgradtag").cast(pl.Float64, strict=False),
-        )
-        .filter(pl.col("Heizgradtag").is_not_null())
-        .group_by("Jahr")
-        .agg(pl.col("Heizgradtag").sum().round(1).alias("hdd_zurich"))
-        .rename({"Jahr": "year"})
-        .sort("year")
-    )
-
-    # Build composite: Zurich pre-1994, BFE 1994+
-    df_hdd_pre1994 = (
-        df_hdd_zurich
-        .filter(pl.col("year") < 1994)
-        .filter(pl.col("year") >= 1980)
-        .rename({"hdd_zurich": "hdd"})
-    )
-
-    df_hdd = pl.concat([df_hdd_pre1994, df_hdd_bfe]).sort("year").unique("year")
-
+def _(hdd_path, hdd_zurich_path, load_hdd):
+    df_hdd = load_hdd(hdd_path, hdd_zurich_path)
     print(f"HDD data: {df_hdd.shape[0]} years from {df_hdd['year'].min()} to {df_hdd['year'].max()}")
-    print(f"  Pre-1994: Zurich Fluntern station ({df_hdd_pre1994.shape[0]} years)")
-    print(f"  1994+: BFE national weighted ({df_hdd_bfe.shape[0]} years)")
-    print(f"  2024 HDD: {df_hdd.filter(pl.col('year') == 2024)['hdd'][0]:.1f}")
     df_hdd.tail(10)
     return (df_hdd,)
 
 
 @app.cell
-def _(df_hdd, go):
+def _(apply_theme, df_hdd, go):
     # HDD trend with OLS trendline
     years = df_hdd["year"].to_list()
     hdds = df_hdd["hdd"].to_list()
 
-    # Simple linear regression (no numpy dependency)
     n = len(years)
     sum_x = sum(years)
     sum_y = sum(hdds)
@@ -460,8 +426,7 @@ def _(df_hdd, go):
     fig_hdd = go.Figure()
     fig_hdd.add_trace(go.Scatter(
         x=years, y=hdds,
-        name="HDD (actual)",
-        mode="markers",
+        name="HDD (actual)", mode="markers",
         marker=dict(size=8, color="#FF9800"),
     ))
     fig_hdd.add_trace(go.Scatter(
@@ -471,14 +436,10 @@ def _(df_hdd, go):
         line=dict(color="#F44336", width=2, dash="dash"),
     ))
 
-    fig_hdd.update_layout(
+    apply_theme(fig_hdd).update_layout(
         title="Heating Degree Days — Switzerland (base 20/12°C, Zurich Plateau)",
         xaxis_title="Year",
         yaxis_title="HDD",
-        template="plotly_white",
-        font=dict(size=14),
-        width=950,
-        height=500,
     )
     fig_hdd
     return
@@ -500,70 +461,115 @@ def _(mo):
     return
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# 3. POPULATION
+# ═══════════════════════════════════════════════════════════════════════
+
+
 @app.cell
 def _(mo):
     mo.md("""
     ---
     ## 3. Population — The P Factor
 
-    Source: BFS (Federal Statistical Office) — PX-Web API
+    Sources:
+    - **1960–2009**: World Bank (SP.POP.TOTL) — annual mid-year estimates
+    - **2010–2024**: BFS STATPOP (permanent resident population, end-of-year)
+    - **2025–2060**: BFS Population Projections (reference, high, low scenarios)
+
+    The extended historical view reveals Switzerland's immigration-driven
+    population waves: rapid growth in the 1960s (Italian/Spanish guest workers),
+    stagnation in the 1970s (oil crisis + Schwarzenbach initiative), and
+    re-acceleration from the 1990s (Yugoslav immigration, EU free movement from 2002).
     """)
     return
 
 
 @app.cell
-def _(RAW_DIR, json, pl, pop_path):
-    # Parse BFS population JSON (STATPOP, 2010+)
-    pop_data = json.loads(pop_path.read_text())
-
-    pop_records = []
-    for _entry in pop_data.get("data", []):
-        _year = int(_entry["key"][0])
-        _val = _entry["values"][0]
-        if _val and _val != "...":
-            pop_records.append({"year": _year, "population": int(_val)})
-
-    df_pop = pl.DataFrame(pop_records).sort("year")
-    print(f"BFS STATPOP data: {df_pop.shape[0]} years ({df_pop['year'].min()}-{df_pop['year'].max()})")
-
-    # Extend backward with World Bank SP.POP.TOTL for 2000-2009
-    _wb_raw = json.loads((RAW_DIR / "worldbank_pop_ch.json").read_text())
-    _wb_records = [
-        {"year": int(e["date"]), "population": int(e["value"])}
-        for e in _wb_raw[1]
-        if e["value"] is not None and int(e["date"]) < df_pop["year"].min()
-    ]
-    df_pop_hist = pl.DataFrame(_wb_records)
-    df_pop_full = pl.concat([df_pop_hist, df_pop]).sort("year").unique("year")
+def _(RAW_DIR, load_population, pl, pop_path):
+    df_pop_full = load_population(pop_path, RAW_DIR / "worldbank_pop_ch.json")
     print(f"Full population series: {df_pop_full.shape[0]} years ({df_pop_full['year'].min()}-{df_pop_full['year'].max()})")
 
+    # Load BFS projections (reference, high, low)
+    _proj_path = RAW_DIR / "bfs_pop_projections.csv"
+    df_pop_proj = pl.read_csv(_proj_path) if _proj_path.exists() else None
+    if df_pop_proj is not None:
+        print(f"BFS projections: {df_pop_proj.shape[0]} years ({df_pop_proj['year'].min()}-{df_pop_proj['year'].max()})")
+
     df_pop_full
-    return (df_pop_full,)
+    return df_pop_full, df_pop_proj
 
 
 @app.cell
-def _(df_pop_full, go):
+def _(apply_theme, df_pop_full, df_pop_proj, go):
     fig_pop = go.Figure()
+
+    # Historical data (solid line)
     fig_pop.add_trace(go.Scatter(
         x=df_pop_full["year"].to_list(),
         y=[p / 1_000_000 for p in df_pop_full["population"].to_list()],
-        name="Population",
+        name="Historical",
         mode="lines+markers",
         line=dict(color="#9C27B0", width=3),
-        marker=dict(size=5),
+        marker=dict(size=4),
     ))
 
-    fig_pop.update_layout(
-        title="Swiss Population (millions)",
+    # BFS projections (if available)
+    if df_pop_proj is not None:
+        _proj_years = df_pop_proj["year"].to_list()
+        # Connect projection to last historical point
+        _last_hist_year = df_pop_full["year"].max()
+        _last_hist_pop = df_pop_full.filter(df_pop_full["year"] == _last_hist_year)["population"][0] / 1e6
+
+        # High/Low envelope
+        _hi = [p / 1e6 for p in df_pop_proj["pop_high"].to_list()]
+        _lo = [p / 1e6 for p in df_pop_proj["pop_low"].to_list()]
+        fig_pop.add_trace(go.Scatter(
+            x=[_last_hist_year] + _proj_years + _proj_years[::-1] + [_last_hist_year],
+            y=[_last_hist_pop] + _hi + _lo[::-1] + [_last_hist_pop],
+            fill="toself",
+            fillcolor="rgba(156, 39, 176, 0.12)",
+            line=dict(width=0),
+            name="BFS high/low range",
+            showlegend=True,
+        ))
+
+        # Reference scenario (dashed)
+        _ref = [p / 1e6 for p in df_pop_proj["pop_reference"].to_list()]
+        fig_pop.add_trace(go.Scatter(
+            x=[_last_hist_year] + _proj_years,
+            y=[_last_hist_pop] + _ref,
+            name="BFS Reference",
+            mode="lines",
+            line=dict(color="#9C27B0", width=2.5, dash="dash"),
+        ))
+
+    # Annotations for key inflection points
+    _annotations = [
+        (1964, 5.6, "Guest worker wave<br>(IT, ES, PT)", "right"),
+        (1974, 6.3, "Oil crisis +<br>Schwarzenbach", "left"),
+        (2002, 7.3, "EU free<br>movement", "right"),
+    ]
+    for _yr, _y, _text, _anchor in _annotations:
+        fig_pop.add_annotation(
+            x=_yr, y=_y, text=_text,
+            showarrow=True, arrowhead=2, arrowsize=0.8,
+            ax=40 if _anchor == "right" else -40, ay=-30,
+            font=dict(size=10, color="#666"),
+        )
+
+    apply_theme(fig_pop).update_layout(
+        title="Swiss Population — History (1960–2024) & BFS Projections (2025–2060)",
         xaxis_title="Year",
         yaxis_title="Population (millions)",
-        template="plotly_white",
-        font=dict(size=14),
-        width=900,
-        height=450,
     )
     fig_pop
     return
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 4. HEATING MIX (Floor Area Shares)
+# ═══════════════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -584,125 +590,29 @@ def _(mo):
     > **Caveat:** Floor area shares differ from building count shares (BFS GWR).
     > Heat pumps dominate new large MFH construction, so their floor area share (~29% in 2024)
     > exceeds their building count share (~23%). Oil remains #1 by building count (35%).
-    > See [BFS energy sector](https://www.bfs.admin.ch/bfs/en/home/statistics/construction-housing/buildings/energy-sector.html).
     """)
     return
 
 
 @app.cell
-def _(RAW_DIR, pl):
-    import openpyxl
-
-    # ── 1. BFE/Prognos Tabelle 13: Floor area by heating system (Mio m² EBF), 2000–2024 ──
-    wb = openpyxl.load_workbook(RAW_DIR / "bfe_hh_energy_by_use_2024.xlsx", data_only=True)
-    ws13 = wb["Tabelle13"]
-
-    # Row 6 = header: col[1]="Anlagensystem", cols[2:27]=years 2000–2024
-    # Rows 7–14 = heating systems (col[1]=label, cols[2:27]=values), row 15 = Total
-    header_row = list(ws13.iter_rows(min_row=6, max_row=6, values_only=True))[0]
-    years_t13 = [int(v) for v in header_row[2:27] if isinstance(v, (int, float))]
-
-    _system_rows = {}
-    for _row in ws13.iter_rows(min_row=7, max_row=14, values_only=True):
-        _label = _row[1]
-        if _label and _label != "Total":
-            _vals = [float(v) if v is not None else 0.0 for v in _row[2:27]]
-            _system_rows[_label.strip()] = _vals
-
-    # Map German labels → English column names
-    _label_map = {
-        "Heizöl": "oil",
-        "Erdgas": "gas",
-        "Elektrische Wärmepumpen": "heat_pump",
-        "Holz": "wood",
-        "El. Widerstandsheizungen": "electric_resistance",
-        "Fernwärme": "district_heating",
-        "Kohle": "coal",
-        "Übrige/ ohne Heizsystem": "other",
-    }
-
-    # Build DataFrame with absolute values (Mio m²)
-    t13_data = {"year": years_t13}
-    for _de_label, _en_col in _label_map.items():
-        t13_data[_en_col] = _system_rows.get(_de_label, [0.0] * len(years_t13))
-
-    df_ebf = pl.DataFrame(t13_data)
-
-    # Compute percentage shares
-    carrier_cols = list(_label_map.values())
-    df_mix = df_ebf.with_columns(
-        _total=sum(pl.col(c) for c in carrier_cols),
-    ).with_columns(
-        **{c: (pl.col(c) / pl.col("_total") * 100).round(1) for c in carrier_cols}
-    ).drop("_total")
-
-    # Merge coal + other into "other_solar" to match chart categories
-    df_mix = df_mix.with_columns(
-        other_solar=(pl.col("coal") + pl.col("other")).round(1),
-    ).drop("coal", "other")
-
-    wb.close()
+def _(RAW_DIR, load_heating_mix):
+    df_mix = load_heating_mix(RAW_DIR / "bfe_hh_energy_by_use_2024.xlsx")
     df_mix
     return (df_mix,)
 
 
 @app.cell
-def _(RAW_DIR, pl):
-    import openpyxl as _openpyxl
-
-    # ── 2. BFE/Prognos Tabelle 11: Space heating energy by carrier (PJ), 2000–2024 ──
-    # This provides a cross-check on the floor-area shares above.
-    wb11 = _openpyxl.load_workbook(RAW_DIR / "bfe_hh_energy_by_use_2024.xlsx", data_only=True)
-    ws11 = wb11["Tabelle11"]
-
-    # Row 6 = header: col[1]="Energieträger", cols[2:27]=years 2000–2024
-    # Rows 7–16 = carriers (col[1]=label, cols[2:27]=values), row 16 = Total
-    header_row_11 = list(ws11.iter_rows(min_row=6, max_row=6, values_only=True))[0]
-    years_t11 = [int(v) for v in header_row_11[2:27] if isinstance(v, (int, float))]
-
-    _carrier_rows_11 = {}
-    for _row in ws11.iter_rows(min_row=7, max_row=16, values_only=True):
-        _label = _row[1]
-        if _label and _label != "Total" and not str(_label).strip().startswith("darunter"):
-            _vals = [float(v) if v is not None else 0.0 for v in _row[2:27]]
-            _carrier_rows_11[_label.strip()] = _vals
-
-    _label_map_11 = {
-        "Heizöl": "oil",
-        "Erdgas": "gas",
-        "Elektrische Wärmepumpen": "heat_pump_elec",
-        "Holz": "wood",
-        "El. Widerstandsheizungen": "electric_resistance",
-        "Fernwärme": "district_heating",
-        "Kohle": "coal",
-        "Umweltwärme": "ambient_heat",
-        "Solar": "solar",
-    }
-
-    _t11_data = {"year": years_t11}
-    for _de_label, _en_col in _label_map_11.items():
-        _t11_data[_en_col] = _carrier_rows_11.get(_de_label, [0.0] * len(years_t11))
-
-    df_heating_energy = pl.DataFrame(_t11_data)
-
-    # Show energy shares (%) for comparison
-    _energy_cols = list(_label_map_11.values())
-    df_heating_energy_pct = df_heating_energy.with_columns(
-        _total=sum(pl.col(c) for c in _energy_cols),
-    ).with_columns(
-        **{c: (pl.col(c) / pl.col("_total") * 100).round(1) for c in _energy_cols}
-    ).drop("_total")
-
+def _(RAW_DIR, load_heating_energy):
+    df_heating_energy_pct = load_heating_energy(RAW_DIR / "bfe_hh_energy_by_use_2024.xlsx")
     df_heating_energy_pct
     return
 
 
 @app.cell
-def _(download_json_api, json, mo, pl):
-    # ── 3. BFS Census (PxWeb): Building counts by heating energy source, 1990 & 2000 ──
-    # Table: px-x-0902020100_122 (census 1970/1980/1990/2000)
-    # Energieträger: 1=Heizöl, 2=Gas, 3=Elektrizität, 4=Holz/Kohle, 5=Andere, 9=Ohne
-    census_path = download_json_api(
+def _(DATA_DIR, download_json, json, mo, pl):
+    # BFS Census — Building counts by heating energy source, 1990 & 2000
+    census_path = download_json(
+        DATA_DIR,
         "https://www.pxweb.bfs.admin.ch/api/v1/de/px-x-0902020100_122/px-x-0902020100_122.px",
         "bfs_census_buildings_heating.json",
         payload={
@@ -718,16 +628,9 @@ def _(download_json_api, json, mo, pl):
     )
 
     raw_census = json.loads(census_path.read_text())
-
-    # PxWeb returns key = [kanton_code, energieträger_code, year]
-    # Energieträger codes: 1=Heizöl, 2=Gas, 3=Elektrizität, 4=Holz/Kohle, 5=Andere, 9=Ohne
     code_to_carrier = {
-        "1": "oil",
-        "2": "gas",
-        "3": "electric",  # includes heat pumps + resistance
-        "4": "wood_coal",
-        "5": "other",
-        "9": "none",
+        "1": "oil", "2": "gas", "3": "electric",
+        "4": "wood_coal", "5": "other", "9": "none",
     }
 
     _census_records = []
@@ -735,14 +638,10 @@ def _(download_json_api, json, mo, pl):
         _carrier_code = _entry["key"][1]
         _year = int(_entry["key"][2])
         _count = int(_entry["values"][0]) if _entry["values"][0] != "..." else 0
-        _carrier_en = code_to_carrier.get(_carrier_code, _carrier_code)
-        _census_records.append({"year": _year, "carrier": _carrier_en, "buildings": _count})
+        _census_records.append({"year": _year, "carrier": code_to_carrier.get(_carrier_code, _carrier_code), "buildings": _count})
 
-    df_census_raw = pl.DataFrame(_census_records)
-
-    # Pivot to wide format and compute percentages
     df_census = (
-        df_census_raw
+        pl.DataFrame(_census_records)
         .pivot(on="carrier", index="year", values="buildings")
         .sort("year")
     )
@@ -759,50 +658,24 @@ def _(download_json_api, json, mo, pl):
 
 
 @app.cell
-def _(df_mix, go):
-    # Stacked area chart — Heating Mix (floor area shares from BFE/Prognos Tabelle 13)
-    carriers = ["oil", "gas", "heat_pump", "wood", "electric_resistance", "district_heating", "other_solar"]
-    mix_colors = {
-        "oil": "#8B4513",
-        "gas": "#FF6B35",
-        "heat_pump": "#2196F3",
-        "wood": "#4CAF50",
-        "electric_resistance": "#FFC107",
-        "district_heating": "#9C27B0",
-        "other_solar": "#00BCD4",
-    }
-    mix_labels = {
-        "oil": "Heating Oil",
-        "gas": "Natural Gas",
-        "heat_pump": "Heat Pumps (electric)",
-        "wood": "Wood / Biomass",
-        "electric_resistance": "Electric Resistance",
-        "district_heating": "District Heating",
-        "other_solar": "Other (Coal + misc)",
-    }
-
+def _(MIX_CARRIERS, MIX_COLORS, MIX_LABELS, apply_theme, df_mix, go):
     fig_mix = go.Figure()
-    for _carrier in carriers:
+    for _carrier in MIX_CARRIERS:
         fig_mix.add_trace(go.Scatter(
             x=df_mix["year"].to_list(),
             y=df_mix[_carrier].to_list(),
-            name=mix_labels[_carrier],
+            name=MIX_LABELS[_carrier],
             mode="lines",
             stackgroup="one",
-            line=dict(width=0.5, color=mix_colors[_carrier]),
-            fillcolor=mix_colors[_carrier],
+            line=dict(width=0.5, color=MIX_COLORS[_carrier]),
+            fillcolor=MIX_COLORS[_carrier],
         ))
 
-    fig_mix.update_layout(
+    apply_theme(fig_mix).update_layout(
         title="Swiss Residential Heating — Floor Area Share by System (%, BFE/Prognos 2025)",
         xaxis_title="Year",
         yaxis_title="Share of Floor Area (%)",
         yaxis=dict(range=[0, 100]),
-        template="plotly_white",
-        font=dict(size=14),
-        width=950,
-        height=550,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
     )
     fig_mix
     return
@@ -814,20 +687,19 @@ def _(mo):
     ### Key Observations — Heating Mix
 
     **Important: this chart shows floor area shares (BFE/Prognos Tabelle 13), not building counts.**
-    Floor area weights large multi-family buildings more heavily than small detached houses.
-    By raw building count (BFS GWR 2024), oil still leads at **35%** vs heat pumps at **~23%**
-    ([BFS 2024](https://www.bfs.admin.ch/bfs/en/home/statistics/construction-housing/buildings/energy-sector.html),
-    [swissinfo](https://www.swissinfo.ch/eng/climate-solutions/one-fifth-of-swiss-households-heat-with-heat-pumps/87598078)).
-    Heat pumps dominate new MFH construction, inflating their floor area share relative to building count.
 
     - **Oil floor area halved**: 59.9% (2000) → 23.9% (2024) — still #1 by building count (35%)
-    - **Heat pumps lead by floor area** (28.9%) but not by building count (~23%) — the difference
-      reflects their dominance in new large MFH buildings
+    - **Heat pumps lead by floor area** (28.9%) but not by building count (~23%)
     - **Gas peaked ~2022** at ~27% and is declining (energy crisis + cantonal fossil bans)
     - **Wood + district heating growing steadily**: combined ~12% → ~16%
     - **Electric resistance flat** at ~5–7% — legacy stock, no new installs
     """)
     return
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 5. DECOUPLING ANALYSIS
+# ═══════════════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -845,10 +717,17 @@ def _(mo):
 
 
 @app.cell
-def _(df_floor_area, df_hh, df_pop_full, df_wb_gdp, get_sh_share, go, pl):
-    # Build the decoupling chart from REAL data
+def _(RAW_DIR, load_floor_area, load_gdp):
+    df_floor_area = load_floor_area(RAW_DIR / "floor_area_by_building_category.xlsx")
+    df_wb_gdp = load_gdp(RAW_DIR / "worldbank_gdp_ch.json")
+    print(f"Floor area data: {df_floor_area.shape[0]} years ({df_floor_area['year'].min()}-{df_floor_area['year'].max()})")
+    print(f"World Bank GDP: {df_wb_gdp.shape[0]} years ({df_wb_gdp['year'].min()}-{df_wb_gdp['year'].max()})")
+    return df_floor_area, df_wb_gdp
 
-    # 1. Space-heating energy by year (BFE household balance × SH share)
+
+@app.cell
+def _(DECOUPLE_SERIES, apply_theme, df_floor_area, df_hh, df_pop_full, df_wb_gdp, get_sh_share, go, pl):
+    # Build the decoupling chart from REAL data
     _df_hh_yearly = (
         df_hh
         .group_by("Jahr")
@@ -862,18 +741,10 @@ def _(df_floor_area, df_hh, df_pop_full, df_wb_gdp, get_sh_share, go, pl):
         (pl.col("hh_TJ") * pl.Series("_sh", _sh_shares)).alias("total_TJ"),
     )
 
-    # 2. GDP from World Bank (real, constant LCU -> billion CHF)
-    _df_gdp = df_wb_gdp.select(
-        pl.col("year"),
-        pl.col("gdp_bn_chf").alias("gdp_bn"),
-    )
-
-    # 3. Population (from BFS API)
+    _df_gdp = df_wb_gdp.select(pl.col("year"), pl.col("gdp_bn_chf").alias("gdp_bn"))
     _df_pop = df_pop_full.filter(pl.col("year") >= 2000)
 
-    # 4. Floor area — back-extrapolate 2000–2011 from BFS 2012+ data
-    #    BFS df_floor_area gives m2_per_person_avg (2012+); we extrapolate
-    #    backward at 0.3%/yr growth (consistent with BFS long-run trend).
+    # Back-extrapolate floor area for 2000–2011
     _m2pp_2012 = df_floor_area.filter(pl.col("year") == 2012)["m2_per_person_avg"][0]
     _floor_pre_records = []
     for _row in _df_pop.filter(pl.col("year") < 2012).iter_rows(named=True):
@@ -882,22 +753,17 @@ def _(df_floor_area, df_hh, df_pop_full, df_wb_gdp, get_sh_share, go, pl):
         _floor_pre_records.append({"year": _yr, "floor_area_mio_m2": round(_m2pp * _pop / 1e6, 1)})
     _floor_hardcoded = pl.DataFrame(_floor_pre_records)
 
-    # For 2012+ compute total floor area = m2_per_person_avg * population / 1e6
     _df_floor_real = (
         df_floor_area
         .select("year", "m2_per_person_avg")
         .join(_df_pop.select("year", "population"), on="year", how="left")
         .with_columns(
-            (pl.col("m2_per_person_avg") * pl.col("population") / 1e6)
-            .round(1)
-            .alias("floor_area_mio_m2"),
+            (pl.col("m2_per_person_avg") * pl.col("population") / 1e6).round(1).alias("floor_area_mio_m2"),
         )
         .select("year", "floor_area_mio_m2")
     )
-
     _df_floor = pl.concat([_floor_hardcoded, _df_floor_real]).sort("year")
 
-    # Join everything and index to 2000=100
     _df_decoupling = (
         _df_hh_yearly
         .join(_df_gdp, on="year", how="left")
@@ -905,37 +771,18 @@ def _(df_floor_area, df_hh, df_pop_full, df_wb_gdp, get_sh_share, go, pl):
         .join(_df_floor, on="year", how="left")
     )
 
-    # Get base year values
     _base = _df_decoupling.filter(pl.col("year") == 2000)
-    _base_energy = _base["total_TJ"][0]
-    _base_gdp = _base["gdp_bn"][0]
-    _base_pop = _base["population"][0]
-    _base_floor = _base["floor_area_mio_m2"][0]
-
     df_indexed = _df_decoupling.with_columns(
-        (pl.col("total_TJ") / _base_energy * 100).alias("energy_idx"),
-        (pl.col("gdp_bn") / _base_gdp * 100).alias("gdp_idx"),
-        (pl.col("population") / _base_pop * 100).alias("pop_idx"),
-        (pl.col("floor_area_mio_m2") / _base_floor * 100).alias("floor_idx"),
-    )
-
-    # Compute energy intensity index
-    df_indexed = df_indexed.with_columns(
+        (pl.col("total_TJ") / _base["total_TJ"][0] * 100).alias("energy_idx"),
+        (pl.col("gdp_bn") / _base["gdp_bn"][0] * 100).alias("gdp_idx"),
+        (pl.col("population") / _base["population"][0] * 100).alias("pop_idx"),
+        (pl.col("floor_area_mio_m2") / _base["floor_area_mio_m2"][0] * 100).alias("floor_idx"),
+    ).with_columns(
         (pl.col("energy_idx") / pl.col("floor_idx") * 100).alias("intensity_idx"),
     )
 
-    # Plot
     _fig_decouple = go.Figure()
-
-    _series = [
-        ("gdp_idx", "GDP (real)", "#E91E63", "solid", 3),
-        ("pop_idx", "Population", "#9C27B0", "dash", 2),
-        ("floor_idx", "Heated Floor Area", "#FF9800", "dashdot", 2),
-        ("energy_idx", "Space-Heating Energy", "#2196F3", "solid", 3),
-        ("intensity_idx", "Energy Intensity (kWh/m2)", "#F44336", "dot", 2),
-    ]
-
-    for _col, _name, _color, _dash, _width in _series:
+    for _col, _name, _color, _dash, _width in DECOUPLE_SERIES:
         _fig_decouple.add_trace(go.Scatter(
             x=df_indexed["year"].to_list(),
             y=df_indexed[_col].to_list(),
@@ -944,31 +791,29 @@ def _(df_floor_area, df_hh, df_pop_full, df_wb_gdp, get_sh_share, go, pl):
             line=dict(color=_color, width=_width, dash=_dash),
             marker=dict(size=4),
         ))
-
     _fig_decouple.add_hline(y=100, line_dash="dot", line_color="gray", opacity=0.5)
 
-    # Policy annotations
-    for _yr, _text, _y_pos in [
-        (2008, "CO2 levy", 108),
-        (2010, "Gebaudeprogramm", 118),
-        (2015, "MuKEn 2014", 128),
-        (2022, "CHF 120/t CO2", 138),
-    ]:
-        _fig_decouple.add_vline(x=_yr, line_dash="dot", line_color="rgba(0,0,0,0.15)")
+    # Policy milestones — stagger y to avoid overlap when years are close
+    _policy_milestones = [
+        (2007, "SIA 380/1",       1.02),
+        (2008, "CO\u2082 levy",   1.10),  # stagger up — only 1 yr from SIA
+        (2010, "Buildings Prog.", 1.02),
+        (2015, "MuKEn 2014",      1.02),
+        (2022, "CHF 120/t CO\u2082", 1.02),
+    ]
+    for _yr, _text, _ypos in _policy_milestones:
+        _fig_decouple.add_vline(x=_yr, line_dash="dot", line_color="rgba(0,0,0,0.12)")
         _fig_decouple.add_annotation(
-            x=_yr, y=_y_pos, text=_text, showarrow=False,
-            font=dict(size=9, color="gray"),
+            x=_yr, y=_ypos, yref="paper", text=_text,
+            showarrow=False, font=dict(size=8, color="#555"),
+            textangle=-35, xanchor="left", yanchor="bottom",
         )
 
-    _fig_decouple.update_layout(
+    apply_theme(_fig_decouple).update_layout(
         title="Decoupling: Space-Heating Energy vs Economic Growth (2000 = 100)",
         xaxis_title="Year",
         yaxis_title="Index (2000 = 100)",
-        template="plotly_white",
-        font=dict(size=14),
-        width=1050,
-        height=600,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.22, xanchor="center", x=0.5),
+        margin=dict(t=110),
     )
     _fig_decouple
     return (df_indexed,)
@@ -976,7 +821,6 @@ def _(df_floor_area, df_hh, df_pop_full, df_wb_gdp, get_sh_share, go, pl):
 
 @app.cell
 def _(df_indexed, mo):
-    # Compute actual changes
     last = df_indexed.filter(df_indexed["year"] == df_indexed["year"].max())
     energy_change = last["energy_idx"][0] - 100
     gdp_change = last["gdp_idx"][0] - 100
@@ -996,81 +840,57 @@ def _(df_indexed, mo):
         | **Population** | +{pop_change:.0f}% | Driven primarily by net immigration; Switzerland grew from 7.2 M to ~9.0 M |
         | **Heated floor area** | +{floor_change:.0f}% | Rising affluence → larger dwellings + more single-person households → more m² per capita |
         | **Space-heating energy** | {energy_change:+.0f}% | Despite upward pressure from P and A, heating energy **fell** — absolute decoupling |
-        | **Energy intensity** | {intensity_change:+.0f}% | Energy per m² declined thanks to insulation retrofits (MuKEn: 90 → 16 kWh/m²), heat-pump adoption (COP 3–4 vs oil 0.9), and warmer winters (HDD −15 %) |
+        | **Energy intensity** | {intensity_change:+.0f}% | Energy per m² declined thanks to insulation retrofits, heat-pump adoption, and warmer winters |
 
         **Absolute decoupling confirmed**: the Technology factor (T) is declining fast enough
-        to more than offset growth in Population (P) and Affluence (A). The inflection
-        point was around **2005–2008**, coinciding with the CO₂ levy introduction (2008)
-        and the launch of the Gebäudeprogramm (2010).
+        to more than offset growth in Population (P) and Affluence (A).
         """
     )
     return
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# 6–8. FLOOR AREA, BUILDINGS, BUILDING STANDARDS
+# ═══════════════════════════════════════════════════════════════════════
+
+
 @app.cell
 def _(mo):
     mo.md("""
     ---
-    ## 6. Policy Timeline — Key Milestones
+    ## 6. BFS Floor Area per Person (2012-2024)
 
-    Linking policy interventions to the observed trend shifts.
+    Source: BFS GWS — T 09.03.02.04.03
     """)
     return
 
 
 @app.cell
-def _(go):
-    policies = [
-        ("SIA 380/1 first edition", 1988, 1988, "#607D8B"),
-        ("Energie 2000 program", 1990, 2000, "#4CAF50"),
-        ("MuKEn 2000", 2000, 2008, "#2196F3"),
-        ("CO2 levy introduced (CHF 12/t)", 2008, 2008, "#F44336"),
-        ("MuKEn 2008", 2008, 2014, "#2196F3"),
-        ("Gebaudeprogramm launched", 2010, 2024, "#9C27B0"),
-        ("CO2 levy CHF 60/t", 2014, 2014, "#F44336"),
-        ("MuKEn 2014 published", 2015, 2025, "#2196F3"),
-        ("Energy Strategy 2050 enacted", 2017, 2017, "#FF9800"),
-        ("CO2 levy CHF 96/t", 2018, 2018, "#F44336"),
-        ("CO2 levy CHF 120/t", 2022, 2022, "#F44336"),
-        ("Zurich fossil heating ban", 2022, 2022, "#E91E63"),
-        ("Climate Protection Act", 2023, 2023, "#FF9800"),
-        ("MuKEn 2025 approved", 2025, 2030, "#2196F3"),
-    ]
-
-    fig_policy = go.Figure()
-    for _i, (_name, _start, _end, _color) in enumerate(policies):
-        if _start == _end:
-            fig_policy.add_trace(go.Scatter(
-                x=[_start], y=[_i], mode="markers",
-                marker=dict(size=12, color=_color, symbol="diamond"),
-                showlegend=False,
-            ))
-        else:
-            fig_policy.add_trace(go.Scatter(
-                x=[_start, _end], y=[_i, _i], mode="lines",
-                line=dict(color=_color, width=6),
-                showlegend=False,
-            ))
-        # Place label to the right of the endpoint
-        fig_policy.add_annotation(
-            x=_end, y=_i, text=_name,
-            xanchor="left", yanchor="middle",
-            xshift=10, showarrow=False,
-            font=dict(size=11, color=_color),
-        )
-
-    fig_policy.update_layout(
-        title="Policy Timeline — Swiss Building Energy & Climate Milestones",
-        xaxis_title="Year",
-        xaxis=dict(range=[1985, 2032]),
-        yaxis=dict(visible=False),
-        template="plotly_white",
-        font=dict(size=13),
-        width=1000,
-        height=600,
-        margin=dict(l=20, r=300),
+def _(apply_theme, df_floor_area, go):
+    fig_floor = go.Figure()
+    fig_floor.add_trace(go.Scatter(
+        x=df_floor_area["year"].to_list(),
+        y=df_floor_area["m2_per_person_sfh"].to_list(),
+        name="Single-Family Houses",
+        mode="lines+markers", line=dict(color="#FF9800", width=2.5), marker=dict(size=6),
+    ))
+    fig_floor.add_trace(go.Scatter(
+        x=df_floor_area["year"].to_list(),
+        y=df_floor_area["m2_per_person_mfh"].to_list(),
+        name="Multi-Family Buildings",
+        mode="lines+markers", line=dict(color="#2196F3", width=2.5), marker=dict(size=6),
+    ))
+    fig_floor.add_trace(go.Scatter(
+        x=df_floor_area["year"].to_list(),
+        y=df_floor_area["m2_per_person_avg"].to_list(),
+        name="Weighted Average (~30/70)",
+        mode="lines+markers", line=dict(color="#4CAF50", width=3, dash="dash"), marker=dict(size=5),
+    ))
+    apply_theme(fig_floor).update_layout(
+        title="Average Floor Area per Person — Swiss Residential Buildings (BFS GWS)",
+        xaxis_title="Year", yaxis_title="m² per person",
     )
-    fig_policy
+    fig_floor
     return
 
 
@@ -1078,20 +898,68 @@ def _(go):
 def _(mo):
     mo.md("""
     ---
-    ## 7. Building Standards Evolution — kWh/m2 Limits
+    ## 7. BFS Buildings by Heating Source — 2000 vs 2021
     """)
     return
 
 
 @app.cell
-def _(go):
+def _(BUILDING_HEAT_COLORS, RAW_DIR, apply_theme, go, load_buildings_heating):
+    df_heating_compare = load_buildings_heating(RAW_DIR / "buildings_heating_source_2000_2021.xlsx")
+
+    _sources = df_heating_compare["source"].to_list()
+    _v2000 = df_heating_compare["buildings_2000"].to_list()
+    _v2021 = df_heating_compare["buildings_2021"].to_list()
+
+    fig_heating_cmp = go.Figure()
+    fig_heating_cmp.add_trace(go.Bar(
+        x=_sources, y=[v / 1000 for v in _v2000], name="2000",
+        marker_color="#BDBDBD",
+        marker_line=dict(color="#757575", width=1.5),
+    ))
+    fig_heating_cmp.add_trace(go.Bar(
+        x=_sources, y=[v / 1000 for v in _v2021], name="2021",
+        marker_color=[BUILDING_HEAT_COLORS.get(s, "#999") for s in _sources],
+    ))
+    apply_theme(fig_heating_cmp).update_layout(
+        title="Residential Buildings by Heating Energy Source \u2014 2000 vs 2021 (BFS GWS)",
+        xaxis_title="Energy Source", yaxis_title="Number of Buildings (thousands)",
+        barmode="group",
+    )
+    fig_heating_cmp
+    return (df_heating_compare,)
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    ### Key Changes 2000 to 2021
+
+    - **Heat pumps**: 60k to 302k buildings (+403%) — the dominant growth story
+    - **Heating oil**: 815k to 723k (-11%) — still the largest single source but declining
+    - **Gas**: 200k to 312k (+56%) — grew but now peaked (post-2018 decline)
+    - **District heating**: 21k to 64k (+210%) — tripled but still small in absolute terms
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    ---
+    ## 8. Building Standards Evolution — kWh/m2 Limits
+    """)
+    return
+
+
+@app.cell
+def _(apply_theme, go):
     standards = {
         "year": [1970, 1975, 2000, 2008, 2014],
         "limit_kwh_m2": [250, 180, 90, 60, 16],
         "label": ["No regulation<br>(~250)", "First SIA norm<br>(~180)",
                   "MuKEn 2000<br>(~90)", "MuKEn 2008<br>(~60)", "MuKEn 2014<br>(16)"],
     }
-
     fig_standards = go.Figure()
     fig_standards.add_trace(go.Bar(
         x=standards["year"], y=standards["limit_kwh_m2"],
@@ -1099,62 +967,34 @@ def _(go):
         marker_color=["#F44336", "#FF9800", "#FFC107", "#4CAF50", "#2196F3"],
         width=4,
     ))
-
-    fig_standards.update_layout(
+    apply_theme(fig_standards).update_layout(
         title="New Building Heating Energy Limit (kWh/m2/yr) — Swiss Standards",
         xaxis_title="Year", yaxis_title="Max Heating Energy (kWh/m2/yr)",
-        template="plotly_white", font=dict(size=14),
-        width=900, height=500, yaxis=dict(range=[0, 310]),
+        yaxis=dict(range=[0, 310]),
     )
     fig_standards
     return
 
 
 @app.cell
-def _(mo):
-    mo.md("""
-    ---
-    ## 8. Building Stock & Renovation Gap
-
-    The structural bottleneck: slow renovation rate + old building stock.
-    """)
-    return
-
-
-@app.cell
-def _(go, make_subplots):
+def _(apply_theme, go, make_subplots):
     age_data = {
         "period": ["Pre-1919", "1919-1945", "1946-1960", "1961-1970", "1971-1980",
                     "1981-1990", "1991-2000", "2001-2010", "2011-2020", "2021+"],
         "share": [12, 8, 10, 14, 16, 11, 9, 8, 9, 3],
         "typical_kwh_m2": [220, 200, 180, 160, 140, 100, 80, 45, 25, 16],
     }
-
     eff_colors = ["#F44336" if k > 150 else "#FF9800" if k > 80 else "#4CAF50"
                   for k in age_data["typical_kwh_m2"]]
 
     fig_stock = make_subplots(
         rows=1, cols=2,
-        subplot_titles=("Building Stock by Construction Period (%)",
-                        "Typical Energy Demand (kWh/m2/yr)"),
+        subplot_titles=("Building Stock by Construction Period (%)", "Typical Energy Demand (kWh/m2/yr)"),
         horizontal_spacing=0.12,
     )
-
-    fig_stock.add_trace(go.Bar(
-        x=age_data["period"], y=age_data["share"],
-        marker_color=eff_colors, showlegend=False,
-    ), row=1, col=1)
-
-    fig_stock.add_trace(go.Bar(
-        x=age_data["period"], y=age_data["typical_kwh_m2"],
-        marker_color=eff_colors, showlegend=False,
-    ), row=1, col=2)
-
-    fig_stock.update_layout(
-        title="Swiss Building Stock: Age Distribution & Energy Performance",
-        template="plotly_white", font=dict(size=13),
-        width=1100, height=500,
-    )
+    fig_stock.add_trace(go.Bar(x=age_data["period"], y=age_data["share"], marker_color=eff_colors, showlegend=False), row=1, col=1)
+    fig_stock.add_trace(go.Bar(x=age_data["period"], y=age_data["typical_kwh_m2"], marker_color=eff_colors, showlegend=False), row=1, col=2)
+    apply_theme(fig_stock).update_layout(title="Swiss Building Stock: Age Distribution & Energy Performance")
     fig_stock.update_yaxes(title_text="Share (%)", row=1, col=1)
     fig_stock.update_yaxes(title_text="kWh/m2/yr", row=1, col=2)
     fig_stock.update_xaxes(tickangle=45)
@@ -1170,123 +1010,427 @@ def _(mo):
     - **60% of buildings built before 1980** — most with poor insulation (140-220 kWh/m2)
     - Current renovation rate: **0.9-1.4%/year** — would take **~100 years** to renovate all
     - Net-zero by 2050 requires **~3%/year** — more than double current rate
-    - Most renovations are **shallow** (window replacement only) not **deep** (full envelope)
-
-    This is the structural constraint limiting how fast T can decline in the IPAT identity.
-    Even as new buildings achieve 16 kWh/m2, the **old stock dominates** total demand.
     """)
     return
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 8b. EFH vs MFH — BUILDING TYPE ANALYSIS
+# ═══════════════════════════════════════════════════════════════════════
 
 
 @app.cell
 def _(mo):
     mo.md("""
     ---
-    ## Summary — IPAT Decomposition Overview
+    ## 8b. EFH vs MFH — Building Type Analysis
 
-    | Factor | Trend (2000-2024) | Direction | Role |
-    |--------|-------------------|-----------|------|
-    | **P** (Population) | +26% | Upward | Moderate pressure |
-    | **A** (Floor area/capita) | +3-4% | Upward | Small pressure |
-    | **T** (Energy/m2) | ~-31% | **Downward** | **Dominant driver** |
-    | **I** (Total heating energy) | ~-10% | **Declining** | **Absolute decoupling** |
+    The aggregate heating statistics mask a critical structural divide: single-family
+    houses (EFH) and multi-family buildings (MFH) differ profoundly in their
+    decarbonisation trajectories.
 
-    **T is falling faster than P x A is rising** — absolute decoupling confirmed.
+    **Key asymmetry (GWR 2024, 1.8 M residential buildings):**
 
-    Drivers of T reduction:
-    1. Building envelope improvements (MuKEn standards: 250 -> 16 kWh/m2)
-    2. Heat pump adoption (COP 3-4.5 vs fossil 1:1)
-    3. Climate warming (HDD ~-5%/decade)
-    4. CO2 levy making fossil heating expensive (CHF 120/tCO2)
+    | Category | Code | Buildings | Population share |
+    |----------|------|-----------|-----------------|
+    | Single-Family (*Einfamilienhaus*, EFH) | 1021 | 1,019k (57%) | ~27% |
+    | Multi-Family (*Mehrfamilienhaus*, MFH) | 1025 | 501k (28%) | ~53% |
+    | Mixed-Use Residential (shop on ground floor) | 1030 | 200k (11%) | ~12% |
+    | Partial Residential (offices with some flats) | 1040 | 80k (4%) | ~8% |
 
-    Main **brake**: slow renovation rate of pre-1980 building stock (0.9-1.4%/yr vs 3% needed).
+    MFH and mixed-use buildings house the majority of the population but face distinct
+    barriers to heat pump adoption that do not apply to single-family houses.
+
+    **Data source:** Swiss Federal Register of Buildings and Dwellings (GWR), accessed
+    via the stats.swiss SDMX API (dataflow `DF_GWS_REG4`, 2021–2024).
     """)
     return
 
 
 @app.cell
-def _(mo):
-    mo.md("""
-    ---
-    ## 9. External Data — World Bank GDP (constant CHF)
-
-    Source: World Bank — NY.GDP.MKTP.KN (GDP in constant local currency units)
-
-    Replaces the hardcoded `gdp_data` dict used in the decoupling cell with
-    authoritative World Bank figures for 2000-2024.
-    """)
-    return
+def _(gwr_heating_path, load_gwr_heating_by_type):
+    df_gwr_by_type = load_gwr_heating_by_type(gwr_heating_path)
+    print(f"GWR data: {df_gwr_by_type.shape[0]} rows, "
+          f"years {df_gwr_by_type['year'].unique().sort().to_list()}")
+    df_gwr_by_type.head(20)
+    return (df_gwr_by_type,)
 
 
 @app.cell
-def _(RAW_DIR, json, pl):
-    _gdp_raw = json.loads((RAW_DIR / "worldbank_gdp_ch.json").read_text())
-    # The World Bank API returns [metadata, data_array]
-    _gdp_entries = _gdp_raw[1]
+def _(BUILDING_HEAT_COLORS, apply_theme, df_gwr_by_type, go, make_subplots, pl):
+    # fig15: Two-panel chart
+    #   Left: 100% stacked bars — heating source by building category (2024)
+    #   Right: HP adoption trend 2021→2024 by category (slope chart)
 
-    _gdp_records = []
-    for _entry in _gdp_entries:
-        _yr = int(_entry["date"])
-        _val = _entry["value"]
-        if _val is not None and 2000 <= _yr <= 2024:
-            _gdp_records.append({"year": _yr, "gdp_real_chf": float(_val)})
+    _latest = df_gwr_by_type.filter(pl.col("year") == df_gwr_by_type["year"].max())
+    _yr = int(_latest["year"].max())
+    _source_order = ["Heating Oil", "Gas", "Heat Pump", "Wood", "Electricity",
+                     "District Heating", "Solar Thermal", "Other"]
+    _cat_order = ["Single-Family (EFH)", "Multi-Family (MFH)",
+                  "Mixed-Use Residential", "Partial Residential"]
+    _cat_short = {"Single-Family (EFH)": "Single-Family\n(EFH)",
+                  "Multi-Family (MFH)": "Multi-Family\n(MFH)",
+                  "Mixed-Use Residential": "Mixed-Use\nResidential",
+                  "Partial Residential": "Partial\nResidential"}
 
-    df_wb_gdp = pl.DataFrame(_gdp_records).sort("year")
-
-    # Add a human-readable column in billions
-    df_wb_gdp = df_wb_gdp.with_columns(
-        (pl.col("gdp_real_chf") / 1e9).round(1).alias("gdp_bn_chf"),
+    fig_heating_by_type = make_subplots(
+        rows=1, cols=2, column_widths=[0.55, 0.45],
+        subplot_titles=(
+            f"Heating Source by Building Category ({_yr})",
+            "Heat Pump Adoption Trend (2021–2024)",
+        ),
+        horizontal_spacing=0.12,
     )
 
-    print(f"World Bank GDP: {df_wb_gdp.shape[0]} years ({df_wb_gdp['year'].min()}-{df_wb_gdp['year'].max()})")
-    print(f"GDP 2000: {df_wb_gdp.filter(pl.col('year') == 2000)['gdp_bn_chf'][0]:.1f} bn CHF")
-    print(f"GDP 2024: {df_wb_gdp.filter(pl.col('year') == 2024)['gdp_bn_chf'][0]:.1f} bn CHF")
-    df_wb_gdp
-    return (df_wb_gdp,)
+    # ── Left panel: 100% stacked horizontal bars ──
+    for _src in _source_order:
+        _pcts = []
+        for _cat in _cat_order:
+            _sub = _latest.filter(
+                (pl.col("building_type") == _cat) & (pl.col("heating_source") == _src)
+            )
+            _count = _sub["building_count"].sum() if len(_sub) > 0 else 0
+            _total = _latest.filter(pl.col("building_type") == _cat)["building_count"].sum()
+            _pcts.append(round(_count / _total * 100, 1) if _total > 0 else 0)
+
+        _color = BUILDING_HEAT_COLORS.get(_src, "#999")
+        fig_heating_by_type.add_trace(go.Bar(
+            y=[_cat_short[c] for c in _cat_order], x=_pcts, orientation="h",
+            name=_src, marker_color=_color, legendgroup=_src,
+            text=[f"{p:.0f}%" if p >= 4 else "" for p in _pcts],
+            textposition="inside", textfont=dict(color="white", size=11),
+            showlegend=True,
+        ), row=1, col=1)
+
+    # Total building count annotations on left panel
+    for _i, _cat in enumerate(_cat_order):
+        _total = _latest.filter(pl.col("building_type") == _cat)["building_count"].sum()
+        fig_heating_by_type.add_annotation(
+            x=102, y=_cat_short[_cat], text=f"<b>n={_total/1000:.0f}k</b>",
+            showarrow=False, font=dict(size=10, color="#444"),
+            xref="x", yref="y",
+        )
+
+    # ── Right panel: HP adoption slope chart ──
+    _hp_colors = {
+        "Single-Family (EFH)": "#FF9800",
+        "Multi-Family (MFH)": "#2196F3",
+        "Mixed-Use Residential": "#9C27B0",
+        "Partial Residential": "#607D8B",
+    }
+    _years = sorted(df_gwr_by_type["year"].unique().to_list())
+
+    for _cat in _cat_order:
+        _hp_pcts = []
+        for _y in _years:
+            _ysub = df_gwr_by_type.filter(
+                (pl.col("year") == _y) & (pl.col("building_type") == _cat)
+            )
+            _hp = _ysub.filter(pl.col("heating_source") == "Heat Pump")["building_count"].sum()
+            _tot = _ysub["building_count"].sum()
+            _hp_pcts.append(round(_hp / _tot * 100, 1) if _tot > 0 else 0)
+
+        fig_heating_by_type.add_trace(go.Scatter(
+            x=_years, y=_hp_pcts, name=_cat, mode="lines+markers+text",
+            line=dict(color=_hp_colors[_cat], width=2.5),
+            marker=dict(size=8, color=_hp_colors[_cat]),
+            text=[f"{p:.0f}%" if i in (0, len(_years)-1) else "" for i, p in enumerate(_hp_pcts)],
+            textposition="top center", textfont=dict(size=10, color=_hp_colors[_cat]),
+            showlegend=False,
+        ), row=1, col=2)
+
+    apply_theme(fig_heating_by_type).update_layout(
+        barmode="stack", height=500, width=1300,
+        margin=dict(l=170, t=85),
+        legend=dict(orientation="h", y=-0.10, x=0.28, xanchor="center", font=dict(size=11)),
+    )
+    fig_heating_by_type.update_xaxes(title_text="Share (%)", range=[0, 108], row=1, col=1)
+    fig_heating_by_type.update_xaxes(title_text="Year", dtick=1, row=1, col=2)
+    fig_heating_by_type.update_yaxes(title_text="Heat Pump Share (%)", row=1, col=2)
+    fig_heating_by_type
+    return (fig_heating_by_type,)
 
 
 @app.cell
-def _(df_wb_gdp, go):
+def _(mo):
+    mo.md("""
+    ### Heat Pump Adoption: A Four-Speed Transition
+
+    The GWR data (2021–2024) reveals a clear hierarchy in heat pump adoption speed:
+
+    | Building Category | HP Share 2021 | HP Share 2024 | Δ (3 yr) |
+    |-------------------|--------------|--------------|----------|
+    | Single-Family (EFH) | 20.9% | 27.8% | **+6.9 pp** |
+    | Multi-Family (MFH) | 14.8% | 20.5% | **+5.7 pp** |
+    | Mixed-Use Residential | 7.2% | 10.9% | +3.7 pp |
+    | Partial Residential | 6.2% | 9.0% | +2.8 pp |
+
+    EFH are leading the transition — but **all categories are accelerating**.
+    The gap between EFH and mixed-use/partial buildings (18 pp) reflects
+    compounding structural barriers:
+
+    **Barriers beyond EFH:**
+    1. **Split incentive** (principal–agent problem): The landlord pays the CAPEX for a
+       heating system replacement, but the tenant benefits from lower *Nebenkosten*
+       (heating costs). This decouples the investment decision from the energy savings.
+    2. **Technical constraints**: Large MFH require higher heating capacity; air-source
+       HPs face noise constraints in dense urban settings; ground-source HPs need
+       drilling permits and outdoor space.
+    3. **Coordination costs**: *Stockwerkeigentum* (condominium) buildings require
+       supermajority owner agreement for major investments — a collective action problem.
+    4. **Temperature requirements**: Older MFH often have radiator-based distribution
+       designed for 55–70 °C flow temperatures, which reduces HP efficiency (COP drops
+       from ~3.5 to ~2.5). Retrofit to underfloor heating is expensive and disruptive.
+    5. **Mixed-use complexity**: Buildings with commercial ground floors (cat. 1030)
+       have different heating profiles per storey and may require separate systems.
+
+    **Policy implication:** Non-EFH buildings house ~73% of the population but
+    adopt heat pumps at half the rate. Targeted instruments are needed: biofuels
+    as a transitional fuel where HP don't fit, mandatory replacement-at-end-of-life
+    rules (as in several cantons), or subsidies that address the split incentive
+    (e.g., allowing landlords to pass through green CAPEX via *Mietzinserhöhung*).
+    """)
+    return
+
+
+@app.cell
+def _(BUILDING_TYPE_COLORS, RAW_DIR, apply_theme, go, load_floor_area_by_period):
+    # fig16: Floor area per person by construction period — EFH vs MFH
+    df_fa_period = load_floor_area_by_period(RAW_DIR / "floor_area_by_building_category.xlsx")
+
+    _periods = df_fa_period["period"].to_list()
+    _efh = df_fa_period["m2_efh"].to_list()
+    _mfh = df_fa_period["m2_mfh"].to_list()
+
+    fig_floor_period = go.Figure()
+    fig_floor_period.add_trace(go.Bar(
+        x=_periods, y=_efh, name="EFH (Single-Family)",
+        marker_color=BUILDING_TYPE_COLORS["EFH"],
+        text=[f"{v:.0f}" for v in _efh], textposition="outside",
+        textfont=dict(size=10),
+    ))
+    fig_floor_period.add_trace(go.Bar(
+        x=_periods, y=_mfh, name="MFH (Multi-Family)",
+        marker_color=BUILDING_TYPE_COLORS["MFH"],
+        text=[f"{v:.0f}" for v in _mfh], textposition="outside",
+        textfont=dict(size=10),
+    ))
+
+    # National average line
+    fig_floor_period.add_hline(
+        y=46.6, line_dash="dash", line_color="#4CAF50", opacity=0.7,
+        annotation_text="National avg: 46.6 m²", annotation_position="top left",
+        annotation_font=dict(size=10, color="#4CAF50"),
+    )
+
+    apply_theme(fig_floor_period).update_layout(
+        title="Floor Area per Person by Construction Period — EFH vs MFH (BFS GWS 2024)",
+        xaxis_title="Construction Period", yaxis_title="m² per person",
+        barmode="group", yaxis=dict(range=[0, 72]),
+    )
+    fig_floor_period.update_xaxes(tickangle=35)
+    fig_floor_period
+    return (fig_floor_period,)
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    ### The Affluence Gap
+
+    Floor area per person is systematically higher in EFH than MFH across all
+    construction periods. As of 2024, EFH residents occupy **55.4 m²/person** vs
+    **43.4 m²/person** in MFH — a **28% premium**.
+
+    This gap reflects both self-selection (wealthier households choose EFH) and
+    structural differences (EFH are designed for single families with more rooms
+    per person). From an IPAT perspective, this means the **A (Affluence)** factor
+    has a spatial dimension: the building type you live in determines your per-capita
+    floor area, which directly scales heating demand.
+
+    **For the LMDI decomposition**, this implies that the "floor area per capita"
+    factor is not uniform across the building stock. A shift toward denser MFH
+    living (driven by urbanisation and immigration) would structurally reduce
+    per-capita floor area and hence energy demand — even without any efficiency
+    improvement.
+    """)
+    return
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 8c. CANTONAL HEAT PUMP MAP
+# ═══════════════════════════════════════════════════════════════════════
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    ---
+    ### 8c. Cantonal Heat Pump Adoption Map
+
+    The GWR SDMX API provides canton-level building data, enabling a spatial
+    view of the energy transition. We map **heat pump share (% of buildings)**
+    for each of the 26 cantons, revealing the geographic heterogeneity behind
+    the national averages shown above.
+
+    This connects to MuKEn adoption timing: cantons that implemented MuKEn 2014
+    earlier tend to show higher HP penetration.
+    """)
+    return
+
+
+@app.cell
+def _(canton_topo_path, gwr_canton_path, load_gwr_canton_hp_share, topojson_to_geojson_cantons):
+    # Convert TopoJSON → GeoJSON with canton properties
+    ch_geojson = topojson_to_geojson_cantons(canton_topo_path)
+
+    # Compute HP share by canton for latest year
+    df_canton_hp = load_gwr_canton_hp_share(gwr_canton_path, year=2024)
+    print(f"Canton HP data: {df_canton_hp.shape[0]} cantons")
+    print(df_canton_hp.select("canton_abbr", "canton_name", "hp_share", "total_buildings").head(5))
+    return ch_geojson, df_canton_hp
+
+
+@app.cell
+def _(apply_theme, ch_geojson, df_canton_hp, go, px):
+    # Choropleth map — HP adoption by canton
+    fig_canton_map = px.choropleth(
+        df_canton_hp.to_pandas(),
+        geojson=ch_geojson,
+        locations="canton_id",
+        featureidkey="properties.canton_id",
+        color="hp_share",
+        hover_name="canton_name",
+        hover_data={"hp_share": ":.1f", "total_buildings": ":,", "canton_id": False},
+        color_continuous_scale=[
+            [0.0, "#F44336"],    # red — low HP
+            [0.35, "#FF9800"],   # orange
+            [0.55, "#FFC107"],   # yellow
+            [0.75, "#8BC34A"],   # light green
+            [1.0, "#2E7D32"],    # dark green — high HP
+        ],
+        labels={"hp_share": "HP Share (%)"},
+    )
+
+    fig_canton_map.update_geos(
+        fitbounds="locations",
+        visible=False,
+        bgcolor="rgba(0,0,0,0)",
+    )
+
+    # Add canton abbreviation labels at centroids
+    _centroids: dict[str, tuple[float, float]] = {
+        "ZH":(8.55,47.37),"BE":(7.45,46.95),"LU":(8.30,47.05),"UR":(8.64,46.77),
+        "SZ":(8.65,47.02),"OW":(8.25,46.88),"NW":(8.38,46.93),"GL":(9.07,46.98),
+        "ZG":(8.52,47.17),"FR":(7.11,46.80),"SO":(7.54,47.33),"BS":(7.59,47.56),
+        "BL":(7.67,47.45),"SH":(8.64,47.70),"AR":(9.38,47.38),"AI":(9.41,47.32),
+        "SG":(9.38,47.25),"GR":(9.53,46.66),"AG":(8.07,47.39),"TG":(9.10,47.58),
+        "TI":(8.95,46.30),"VD":(6.63,46.62),"VS":(7.60,46.23),"NE":(6.86,46.99),
+        "GE":(6.15,46.20),"JU":(7.16,47.35),
+    }
+    for _, row in df_canton_hp.to_pandas().iterrows():
+        _abbr = row["canton_abbr"]
+        if _abbr in _centroids:
+            _lon, _lat = _centroids[_abbr]
+            fig_canton_map.add_trace(go.Scattergeo(
+                lon=[_lon], lat=[_lat],
+                text=[_abbr],
+                mode="text",
+                textfont=dict(size=8, color="#333", family="Inter, Helvetica, sans-serif"),
+                showlegend=False,
+                hoverinfo="skip",
+            ))
+
+    apply_theme(fig_canton_map).update_layout(
+        title="Heat Pump Adoption by Canton (% of buildings, 2024)",
+        height=600, width=800,
+        margin=dict(l=10, r=10, t=80, b=10),
+        coloraxis_colorbar=dict(
+            title="HP Share (%)",
+            thickness=15,
+            len=0.6,
+            y=0.5,
+        ),
+        geo=dict(
+            projection_type="mercator",
+            lonaxis_range=[5.8, 10.6],
+            lataxis_range=[45.8, 47.9],
+        ),
+    )
+    fig_canton_map
+    return (fig_canton_map,)
+
+
+@app.cell
+def _(df_canton_hp, mo):
+    _top = df_canton_hp.sort("hp_share", descending=True).head(5)
+    _bot = df_canton_hp.sort("hp_share").head(5)
+
+    _top_rows = "\n".join(
+        f"        | {r['canton_name']} ({r['canton_abbr']}) | {r['hp_share']:.1f}% | {r['total_buildings']:,} |"
+        for r in _top.to_dicts()
+    )
+    _bot_rows = "\n".join(
+        f"        | {r['canton_name']} ({r['canton_abbr']}) | {r['hp_share']:.1f}% | {r['total_buildings']:,} |"
+        for r in _bot.to_dicts()
+    )
+
+    _spread = _top["hp_share"][0] - _bot["hp_share"][0]
+    _nat_avg = (df_canton_hp["hp_buildings"].sum() / df_canton_hp["total_buildings"].sum() * 100)
+
+    mo.md(
+        f"""
+        ### Cantonal Disparities in Heat Pump Adoption
+
+        National average: **{_nat_avg:.1f}%** of buildings heated by HP (2024).
+        The spread between the leading and lagging canton is **{_spread:.0f} pp**.
+
+        **Top 5 cantons** (highest HP share):
+
+        | Canton | HP Share | Buildings |
+        |--------|--------:|----------:|
+{_top_rows}
+
+        **Bottom 5 cantons** (lowest HP share):
+
+        | Canton | HP Share | Buildings |
+        |--------|--------:|----------:|
+{_bot_rows}
+
+        Urban cantons with dense MFH stock (Basel-Stadt, Genève) tend to lag due to
+        space constraints and the split-incentive problem. Rural cantons with
+        predominantly EFH stock show higher adoption — consistent with the
+        "four-speed transition" pattern from fig15.
+        """
+    )
+    return
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 9. GDP + CROSS-VALIDATION
+# ═══════════════════════════════════════════════════════════════════════
+
+
+@app.cell
+def _(apply_theme, df_wb_gdp, go):
     fig_wb_gdp = go.Figure()
     fig_wb_gdp.add_trace(go.Scatter(
         x=df_wb_gdp["year"].to_list(),
         y=df_wb_gdp["gdp_bn_chf"].to_list(),
         name="GDP (constant CHF)",
-        mode="lines+markers",
-        line=dict(color="#E91E63", width=3),
-        marker=dict(size=5),
+        mode="lines+markers", line=dict(color="#E91E63", width=3), marker=dict(size=5),
     ))
-
-    fig_wb_gdp.update_layout(
+    apply_theme(fig_wb_gdp).update_layout(
         title="Swiss GDP — World Bank (constant LCU, billion CHF)",
-        xaxis_title="Year",
-        yaxis_title="GDP (billion CHF, constant prices)",
-        template="plotly_white",
-        font=dict(size=14),
-        width=950,
-        height=500,
+        xaxis_title="Year", yaxis_title="GDP (billion CHF, constant prices)",
     )
     fig_wb_gdp
     return
 
 
 @app.cell
-def _(mo):
-    mo.md("""
-    ---
-    ## 10. Population Source Cross-Validation — BFS STATPOP vs World Bank
-
-    Source: World Bank — SP.POP.TOTL
-
-    Our population series uses World Bank data for 2000-2009 and BFS STATPOP for 2010+.
-    This cross-validates both sources on the overlap years (2010-2024) to confirm consistency.
-    """)
-    return
-
-
-@app.cell
-def _(RAW_DIR, json, pl, pop_path):
-    # BFS STATPOP (2010+)
+def _(RAW_DIR, json, mo, pl, pop_path):
+    # Population cross-validation — BFS vs World Bank
     _bfs_data = json.loads(pop_path.read_text())
     _bfs_records = [
         {"year": int(e["key"][0]), "bfs_population": int(e["values"][0])}
@@ -1295,739 +1439,413 @@ def _(RAW_DIR, json, pl, pop_path):
     ]
     _df_bfs = pl.DataFrame(_bfs_records).sort("year")
 
-    # World Bank (2000-2024)
     _wb_raw = json.loads((RAW_DIR / "worldbank_pop_ch.json").read_text())
     _wb_records = [
         {"year": int(e["date"]), "wb_population": int(e["value"])}
-        for e in _wb_raw[1]
-        if e["value"] is not None
+        for e in _wb_raw[1] if e["value"] is not None
     ]
     _df_wb = pl.DataFrame(_wb_records).sort("year")
 
-    # Compare on overlap years
     df_pop_validation = _df_bfs.join(_df_wb, on="year", how="inner").with_columns(
-        ((pl.col("wb_population") - pl.col("bfs_population")) / pl.col("bfs_population") * 100)
-        .round(2)
-        .alias("diff_pct"),
+        ((pl.col("wb_population") - pl.col("bfs_population")) / pl.col("bfs_population") * 100).round(2).alias("diff_pct"),
     )
-
-    print(f"Population cross-validation — BFS vs World Bank ({df_pop_validation['year'].min()}-{df_pop_validation['year'].max()}):")
-    df_pop_validation
-    return (df_pop_validation,)
-
-
-@app.cell
-def _(df_pop_validation, mo):
     _max_diff = df_pop_validation["diff_pct"].abs().max()
-    mo.md(
-        f"""
-        ### Validation Result
+    mo.md(f"""
+    ### Population Cross-Validation
 
-        Maximum absolute difference between BFS STATPOP and World Bank: **{_max_diff:.2f}%**
-
-        BFS reports permanent resident population (end-of-year), while World Bank uses mid-year
-        estimates. Small differences (<1%) confirm both sources are consistent and the pre-2010
-        World Bank gap-fill is reliable.
-        """
-    )
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md("""
-    ---
-    ## 11. BFS Floor Area per Person (2012-2024)
-
-    Source: BFS GWS — T 09.03.02.04.03 (Durchschnittliche Wohnfläche pro Bewohner)
-
-    Average living area per inhabitant in occupied dwellings, split by building type:
-    - **Einfamilienhauser** (single-family houses)
-    - **Mehrfamilienhauser** (multi-family buildings)
+    Maximum BFS vs World Bank difference: **{_max_diff:.2f}%** — both sources consistent.
     """)
     return
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# 14. LMDI DECOMPOSITION
+# ═══════════════════════════════════════════════════════════════════════
+
+
 @app.cell
-def _(RAW_DIR, pl):
-    import openpyxl as _openpyxl
-
-    _wb = _openpyxl.load_workbook(
-        RAW_DIR / "floor_area_by_building_category.xlsx", data_only=True,
-    )
-
-    _records = []
-    for _sheet_name in _wb.sheetnames:
-        _ws = _wb[_sheet_name]
-        _yr = int(_sheet_name)
-        # Row 5 = "Schweiz" national average; Col 2 = single-family, Col 3 = multi-family
-        _sfh = _ws.cell(row=5, column=2).value
-        _mfh = _ws.cell(row=5, column=3).value
-        if _sfh is not None and _mfh is not None:
-            _records.append({
-                "year": _yr,
-                "m2_per_person_sfh": float(_sfh),
-                "m2_per_person_mfh": float(_mfh),
-            })
-
-    df_floor_area = (
-        pl.DataFrame(_records)
-        .sort("year")
-        .with_columns(
-            # Approximate weighted average (roughly 70% of people live in MFH in Switzerland)
-            (pl.col("m2_per_person_sfh") * 0.30 + pl.col("m2_per_person_mfh") * 0.70)
-            .round(1)
-            .alias("m2_per_person_avg"),
+def _(USE_LMDI_4FACTOR, mo):
+    _n = "4" if USE_LMDI_4FACTOR else "3"
+    if USE_LMDI_4FACTOR:
+        _formula = r"$$E = P \times \frac{A}{P} \times HDD \times \frac{E}{A \cdot HDD}$$"
+        _factors = (
+            r"- **Population effect** ($\Delta E_{\text{pop}}$): more people → more demand" "\n"
+            r"    - **Floor-area effect** ($\Delta E_{\text{floor}}$): rising m² per capita → more space to heat" "\n"
+            r"    - **Weather effect** ($\Delta E_{\text{weather}}$): warmer winters → less demand" "\n"
+            r"    - **Intensity effect** ($\Delta E_{\text{int}}$): technology & behaviour (insulation, heat pumps, efficiency per m²·HDD)"
         )
-    )
-
-    print(f"Floor area data: {df_floor_area.shape[0]} years ({df_floor_area['year'].min()}-{df_floor_area['year'].max()})")
-    df_floor_area
-    return (df_floor_area,)
-
-
-@app.cell
-def _(df_floor_area, go):
-    fig_floor = go.Figure()
-
-    fig_floor.add_trace(go.Scatter(
-        x=df_floor_area["year"].to_list(),
-        y=df_floor_area["m2_per_person_sfh"].to_list(),
-        name="Single-Family Houses",
-        mode="lines+markers",
-        line=dict(color="#FF9800", width=2.5),
-        marker=dict(size=6),
-    ))
-    fig_floor.add_trace(go.Scatter(
-        x=df_floor_area["year"].to_list(),
-        y=df_floor_area["m2_per_person_mfh"].to_list(),
-        name="Multi-Family Buildings",
-        mode="lines+markers",
-        line=dict(color="#2196F3", width=2.5),
-        marker=dict(size=6),
-    ))
-    fig_floor.add_trace(go.Scatter(
-        x=df_floor_area["year"].to_list(),
-        y=df_floor_area["m2_per_person_avg"].to_list(),
-        name="Weighted Average (~30/70)",
-        mode="lines+markers",
-        line=dict(color="#4CAF50", width=3, dash="dash"),
-        marker=dict(size=5),
-    ))
-
-    fig_floor.update_layout(
-        title="Average Floor Area per Person — Swiss Residential Buildings (BFS GWS)",
-        xaxis_title="Year",
-        yaxis_title="m\u00b2 per person",
-        template="plotly_white",
-        font=dict(size=14),
-        width=950,
-        height=500,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.22, xanchor="center", x=0.5),
-    )
-    fig_floor
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md("""
-    ### Observations — Floor Area per Person
-
-    - Single-family houses: **52.4 to 55.4 m²/person** (+5.7% over 2012-2024)
-    - Multi-family buildings: **41.8 to 43.4 m²/person** (+3.8%)
-    - The gap (~12 m²) is stable — SFH residents consistently enjoy more space
-    - Floor area per person is **still growing**, adding pressure to total energy demand (the A factor in IPAT)
-    """)
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md("""
-    ---
-    ## 12. BFS Buildings by Heating Source — 2000 vs 2021
-
-    Source: BFS GWS — T 09.02.07.04
-
-    Comparison of the total number of residential buildings by primary heating energy source.
-    """)
-    return
-
-
-@app.cell
-def _(RAW_DIR, pl):
-    import openpyxl as _openpyxl2
-
-    _wb2 = _openpyxl2.load_workbook(
-        RAW_DIR / "buildings_heating_source_2000_2021.xlsx", data_only=True,
-    )
-
-    # --- 2021 sheet ---
-    # Row 6 = Total row; energy sources in cols 3-11
-    _ws_2021 = _wb2["2021"]
-    _heating_2021 = {
-        "Heat Pump": _ws_2021.cell(row=6, column=3).value,
-        "Gas": _ws_2021.cell(row=6, column=4).value,
-        "Heating Oil": _ws_2021.cell(row=6, column=5).value,
-        "Wood": _ws_2021.cell(row=6, column=6).value,
-        "Electricity": _ws_2021.cell(row=6, column=7).value,
-        "Solar Thermal": _ws_2021.cell(row=6, column=8).value,
-        "District Heating": _ws_2021.cell(row=6, column=9).value,
-        "Other": _ws_2021.cell(row=6, column=10).value,
-    }
-
-    # --- 2000 sheet ---
-    # Row 6 = Total row; energy sources differ slightly (has Kohle/Coal column)
-    _ws_2000 = _wb2["2000"]
-    _heating_2000 = {
-        "Heat Pump": _ws_2000.cell(row=6, column=3).value,
-        "Gas": _ws_2000.cell(row=6, column=4).value,
-        "Heating Oil": _ws_2000.cell(row=6, column=5).value,
-        "Wood": _ws_2000.cell(row=6, column=7).value,
-        "Electricity": _ws_2000.cell(row=6, column=8).value,
-        "Solar Thermal": _ws_2000.cell(row=6, column=9).value,
-        "District Heating": _ws_2000.cell(row=6, column=10).value,
-        "Other": int(_ws_2000.cell(row=6, column=6).value or 0) + int(_ws_2000.cell(row=6, column=11).value or 0),
-    }
-
-    _sources = list(_heating_2021.keys())
-    _vals_2000 = [int(_heating_2000.get(s, 0) or 0) for s in _sources]
-    _vals_2021 = [int(_heating_2021.get(s, 0) or 0) for s in _sources]
-
-    df_heating_compare = pl.DataFrame({
-        "source": _sources,
-        "buildings_2000": _vals_2000,
-        "buildings_2021": _vals_2021,
-    }).with_columns(
-        ((pl.col("buildings_2021") - pl.col("buildings_2000")) / pl.col("buildings_2000").cast(pl.Float64) * 100)
-        .round(1)
-        .alias("change_pct"),
-    )
-
-    print("Buildings by heating source — 2000 vs 2021:")
-    df_heating_compare
-    return (df_heating_compare,)
-
-
-@app.cell
-def _(df_heating_compare, go):
-    _sources = df_heating_compare["source"].to_list()
-    _v2000 = df_heating_compare["buildings_2000"].to_list()
-    _v2021 = df_heating_compare["buildings_2021"].to_list()
-
-    _bar_colors = {
-        "Heat Pump": "#2196F3",
-        "Gas": "#FF6B35",
-        "Heating Oil": "#8B4513",
-        "Wood": "#4CAF50",
-        "Electricity": "#FFC107",
-        "Solar Thermal": "#00BCD4",
-        "District Heating": "#9C27B0",
-        "Other": "#607D8B",
-    }
-
-    fig_heating_cmp = go.Figure()
-
-    fig_heating_cmp.add_trace(go.Bar(
-        x=_sources,
-        y=[v / 1000 for v in _v2000],
-        name="2000",
-        marker_color=[_bar_colors.get(s, "#999") for s in _sources],
-        opacity=0.5,
-    ))
-    fig_heating_cmp.add_trace(go.Bar(
-        x=_sources,
-        y=[v / 1000 for v in _v2021],
-        name="2021",
-        marker_color=[_bar_colors.get(s, "#999") for s in _sources],
-        opacity=0.9,
-    ))
-
-    fig_heating_cmp.update_layout(
-        title="Residential Buildings by Heating Energy Source — 2000 vs 2021 (BFS GWS)",
-        xaxis_title="Energy Source",
-        yaxis_title="Number of Buildings (thousands)",
-        barmode="group",
-        template="plotly_white",
-        font=dict(size=14),
-        width=1000,
-        height=550,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.18, xanchor="center", x=0.5),
-    )
-    fig_heating_cmp
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md("""
-    ### Key Changes 2000 to 2021
-
-    - **Heat pumps**: 60k to 302k buildings (+403%) — the dominant growth story
-    - **Heating oil**: 815k to 723k (-11%) — still the largest single source but declining
-    - **Gas**: 200k to 312k (+56%) — grew but now peaked (post-2018 decline)
-    - **Electricity (resistance)**: 166k to 143k (-14%) — being replaced by heat pumps
-    - **District heating**: 21k to 64k (+210%) — tripled but still small in absolute terms
-    """)
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md("""
-    ---
-    ## 13. BFS Construction & Housing Summary — Dwellings by Energy Source
-
-    Source: BFS — Bau- und Wohnungswesen (bau_wohnungswesen.csv)
-
-    Dwelling-level breakdown of heating energy sources for all of Switzerland.
-    """)
-    return
-
-
-@app.cell
-def _(RAW_DIR, pl):
-    df_bww_raw = pl.read_csv(
-        RAW_DIR / "bau_wohnungswesen.csv",
-        separator=",",
-        encoding="utf8-lossy",
-    )
-
-    # Filter for Switzerland total and dwelling energy variables
-    _energy_var_labels = {
-        "wh_en_t": "Total dwellings",
-        "wh_en_wp": "Heat Pump",
-        "wh_en_gaz": "Gas",
-        "wh_en_hoe": "Heating Oil",
-        "wh_en_hz": "Wood",
-        "wh_en_ez": "Electricity",
-        "wh_en_st": "Solar Thermal",
-        "wh_en_fw": "District Heating",
-        "wh_en_and": "Other",
-        "wh_en_kei": "None / Unknown",
-    }
-
-    df_bww_energy = (
-        df_bww_raw
-        .filter(pl.col("GEO_NR") == "CH")
-        .filter(pl.col("VARIABLE").is_in(list(_energy_var_labels.keys())))
-        .select("VARIABLE", "VALUE", "VALUE_PERIOD")
-        .with_columns(
-            pl.col("VALUE").cast(pl.Float64, strict=False).cast(pl.Int64).alias("dwellings"),
-            pl.col("VARIABLE").replace(_energy_var_labels).alias("energy_source"),
+    else:
+        _formula = r"$$E = P \times \frac{E}{P \cdot HDD} \times HDD$$"
+        _factors = (
+            r"- **Population effect** ($\Delta E_{\text{pop}}$): more people → more demand" "\n"
+            r"    - **Weather effect** ($\Delta E_{\text{weather}}$): warmer winters → less demand" "\n"
+            r"    - **Intensity effect** ($\Delta E_{\text{int}}$): technology & behaviour (insulation, heat pumps, efficiency)"
         )
-        .select("energy_source", "dwellings", "VALUE_PERIOD")
-        .sort("dwellings", descending=True)
-    )
-
-    _total = df_bww_energy.filter(pl.col("energy_source") == "Total dwellings")["dwellings"][0]
-    df_bww_shares = df_bww_energy.filter(pl.col("energy_source") != "Total dwellings").with_columns(
-        (pl.col("dwellings") / _total * 100).round(1).alias("share_pct"),
-    )
-
-    print(f"BFS dwelling energy data — period: {df_bww_energy['VALUE_PERIOD'][0]}")
-    print(f"Total dwellings: {_total:,.0f}")
-    df_bww_shares
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md(r"""
+    mo.md(rf"""
     ---
-    ## 14. LMDI-I Decomposition — Population, Weather & Intensity Effects
+    ## 14. LMDI-I Decomposition — {_n}-Factor Model
 
     **Method**: Logarithmic Mean Divisia Index (additive, Ang 2004)
 
     We decompose the change in **space-heating energy** (household total × SH share)
-    into three factors:
+    into {_n} factors:
 
-    $$E_{\text{total}} = P \times \frac{E}{P \cdot HDD} \times HDD$$
+    {_formula}
 
-    - **Population effect** ($\Delta E_{\text{pop}}$): more people = more heating demand
-    - **Weather effect** ($\Delta E_{\text{weather}}$): warmer winters = less heating demand
-    - **Intensity effect** ($\Delta E_{\text{int}}$): technology & behaviour (insulation, heat pumps, efficiency)
+    {_factors}
 
-    The decomposition is *exact*: $\Delta E_{\text{pop}} + \Delta E_{\text{int}} + \Delta E_{\text{weather}} = E^T - E^0$ (no residual).
+    The decomposition is *exact*: factor effects sum to $E^T - E^0$ (no residual).
+
+    > **Toggle**: Set `USE_LMDI_4FACTOR = False` in the LMDI input cell below to revert to 3-factor.
     """)
     return
 
 
 @app.cell
-def _(df_hdd, df_hh, df_pop_full, get_sh_share, pl):
-    # --- Build the LMDI input table ---
-    # Total household energy by year, then apply space-heating share
+def _(df_floor_area, df_hdd, df_hh, df_pop_full, get_sh_share, pl):
+    # ── Toggle: set to False to revert to 3-factor LMDI ──────────────
+    USE_LMDI_4FACTOR = True
+
+    # Build the LMDI input table
     _df_energy_total = (
         df_hh
-        .group_by("Jahr")
-        .agg(pl.col("TJ").sum().alias("E_hh"))
-        .rename({"Jahr": "year"})
-        .sort("year")
+        .group_by("Jahr").agg(pl.col("TJ").sum().alias("E_hh"))
+        .rename({"Jahr": "year"}).sort("year")
         .filter(pl.col("year") >= 2000)
     )
-
-    # Apply BFE space-heating correction (household total includes hot water,
-    # cooking, appliances — only ~63–72 % is space heating).
     _sh = [get_sh_share(y) for y in _df_energy_total["year"].to_list()]
     _df_energy_total = _df_energy_total.with_columns(
         (pl.col("E_hh") * pl.Series("_sh", _sh)).alias("E"),
     )
 
-    # Join energy, population, and HDD on year
     df_lmdi_input = (
         _df_energy_total
         .join(df_pop_full.select("year", "population"), on="year", how="inner")
         .join(df_hdd.select("year", "hdd"), on="year", how="inner")
         .sort("year")
+        .with_columns(
+            (pl.col("E") / (pl.col("population") * pl.col("hdd"))).alias("intensity"),
+        )
     )
 
-    # Compute energy intensity: E_sh / (P * HDD)
-    df_lmdi_input = df_lmdi_input.with_columns(
-        (pl.col("E") / (pl.col("population") * pl.col("hdd"))).alias("intensity"),
-    )
+    # Optionally attach floor area for 4-factor decomposition
+    if USE_LMDI_4FACTOR:
+        _m2pp_2012 = df_floor_area.filter(pl.col("year") == 2012)["m2_per_person_avg"][0]
+        _floor_records: list[dict] = []
+        for _yr, _pop in zip(
+            df_lmdi_input["year"].to_list(),
+            df_lmdi_input["population"].to_list(),
+        ):
+            _fa_row = df_floor_area.filter(pl.col("year") == _yr)
+            if len(_fa_row) > 0:
+                _m2pp = _fa_row["m2_per_person_avg"][0]
+            else:
+                # Back-extrapolate using +0.3%/yr growth before 2012
+                _m2pp = _m2pp_2012 * (1 - 0.003) ** (2012 - _yr)
+            _floor_records.append({"year": _yr, "floor_area": _m2pp * _pop / 1e6})
+        df_lmdi_input = df_lmdi_input.join(
+            pl.DataFrame(_floor_records), on="year", how="left",
+        )
 
-    print(f"LMDI input (space-heating only): {df_lmdi_input.shape[0]} years "
-          f"({df_lmdi_input['year'].min()}-{df_lmdi_input['year'].max()})")
-    return (df_lmdi_input,)
+    _label = "4-factor" if USE_LMDI_4FACTOR else "3-factor"
+    print(f"LMDI input ({_label}): {df_lmdi_input.shape[0]} years ({df_lmdi_input['year'].min()}-{df_lmdi_input['year'].max()})")
+    return (USE_LMDI_4FACTOR, df_lmdi_input)
 
 
 @app.cell
-def _(df_lmdi_input, pl):
-    import numpy as _np
-
-    # --- Logarithmic mean ---
-    def _log_mean(a: float, b: float) -> float:
-        """L(a, b) = (a - b) / ln(a/b), with L(a, a) = a."""
-        if a <= 0 or b <= 0:
-            return 0.0
-        if abs(a - b) < 1e-12:
-            return a
-        return (a - b) / _np.log(a / b)
-
-    # --- Year-on-year LMDI contributions ---
-    _years = df_lmdi_input["year"].to_list()
-    _E = df_lmdi_input["E"].to_list()
-    _P = df_lmdi_input["population"].to_list()
-    _HDD = df_lmdi_input["hdd"].to_list()
-    _I = df_lmdi_input["intensity"].to_list()
-
-    _records = []
-    for _t in range(1, len(_years)):
-        _L = _log_mean(_E[_t], _E[_t - 1])
-
-        _dE_pop = _L * _np.log(_P[_t] / _P[_t - 1])
-        _dE_weather = _L * _np.log(_HDD[_t] / _HDD[_t - 1])
-        _dE_intensity = _L * _np.log(_I[_t] / _I[_t - 1])
-
-        _records.append({
-            "year": _years[_t],
-            "dE_pop": _dE_pop,
-            "dE_weather": _dE_weather,
-            "dE_intensity": _dE_intensity,
-            "dE_total": _E[_t] - _E[_t - 1],
-        })
-
-    _df_annual = pl.DataFrame(_records)
-
-    # --- Cumulative sums from base year ---
-    df_lmdi = _df_annual.with_columns(
-        pl.col("dE_pop").cum_sum().alias("cum_pop"),
-        pl.col("dE_weather").cum_sum().alias("cum_weather"),
-        pl.col("dE_intensity").cum_sum().alias("cum_intensity"),
-        pl.col("dE_total").cum_sum().alias("cum_total"),
-    )
-
-    # Verify decomposition is exact (residual should be ~0)
-    _residual = (
-        df_lmdi["cum_total"][-1]
-        - df_lmdi["cum_pop"][-1]
-        - df_lmdi["cum_weather"][-1]
-        - df_lmdi["cum_intensity"][-1]
-    )
+def _(USE_LMDI_4FACTOR, compute_lmdi_3factor, compute_lmdi_4factor, df_lmdi_input, verify_decomposition):
+    if USE_LMDI_4FACTOR:
+        df_lmdi = compute_lmdi_4factor(df_lmdi_input)
+        _residual = verify_decomposition(df_lmdi, n_factors=4)
+        print(f"LMDI 4-factor residual: {_residual:.6f} TJ (should be ~0)")
+    else:
+        df_lmdi = compute_lmdi_3factor(df_lmdi_input)
+        _residual = verify_decomposition(df_lmdi, n_factors=3)
+        print(f"LMDI 3-factor residual: {_residual:.6f} TJ (should be ~0)")
     return (df_lmdi,)
 
 
 @app.cell
-def _(df_lmdi, go):
-    # --- Waterfall chart: cumulative contribution from 2000 to latest year ---
+def _(LMDI_COLORS, USE_LMDI_4FACTOR, apply_theme, df_lmdi, go):
+    # Horizontal diverging bar chart (IPCC AR6 convention)
     _last = df_lmdi[-1]
-    _pop_val = _last["cum_pop"].item()
-    _weather_val = _last["cum_weather"].item()
-    _intensity_val = _last["cum_intensity"].item()
+    _factors: list[tuple[str, float, str]] = []
+    if USE_LMDI_4FACTOR:
+        _factors = [
+            ("Intensity (tech.)", _last["cum_intensity"].item(), LMDI_COLORS["intensity"]),
+            ("Weather (HDD)", _last["cum_weather"].item(), LMDI_COLORS["weather"]),
+            ("Floor Area/cap", _last["cum_floor"].item(), LMDI_COLORS["floor_area"]),
+            ("Population", _last["cum_pop"].item(), LMDI_COLORS["population"]),
+        ]
+    else:
+        _factors = [
+            ("Intensity (tech.)", _last["cum_intensity"].item(), LMDI_COLORS["intensity"]),
+            ("Weather (HDD)", _last["cum_weather"].item(), LMDI_COLORS["weather"]),
+            ("Population", _last["cum_pop"].item(), LMDI_COLORS["population"]),
+        ]
     _net_val = _last["cum_total"].item()
 
-    fig_lmdi_waterfall = go.Figure(go.Waterfall(
-        name="LMDI",
-        orientation="v",
-        measure=["relative", "relative", "relative", "total"],
-        x=["Population", "Weather (HDD)", "Intensity (tech.)", "Net Change"],
-        y=[_pop_val, _weather_val, _intensity_val, _net_val],
-        text=[
-            f"{_pop_val:+.0f} TJ",
-            f"{_weather_val:+.0f} TJ",
-            f"{_intensity_val:+.0f} TJ",
-            f"{_net_val:+.0f} TJ",
-        ],
-        textposition="outside",
-        connector=dict(line=dict(color="rgba(0,0,0,0.3)", width=1)),
-        increasing=dict(marker=dict(color="#F44336")),
-        decreasing=dict(marker=dict(color="#4CAF50")),
-        totals=dict(marker=dict(color="#2196F3")),
-    ))
-
-    fig_lmdi_waterfall.update_layout(
-        title="LMDI-I Decomposition of Space-Heating Energy Change (2000 to latest, TJ)",
-        yaxis_title="Cumulative ΔE (TJ)",
-        template="plotly_white",
-        font=dict(size=14),
-        width=900,
-        height=550,
+    fig_lmdi_bar = go.Figure()
+    for _label, _val, _color in _factors:
+        fig_lmdi_bar.add_trace(go.Bar(
+            y=[_label], x=[_val], orientation="h",
+            marker_color=_color, showlegend=False,
+            text=f"{_val:+,.0f} TJ",
+            textposition="inside", insidetextanchor="end",
+            textfont=dict(size=12, color="white"),
+            constraintext="none",
+        ))
+    # Net change as a distinct marker
+    fig_lmdi_bar.add_trace(go.Scatter(
+        x=[_net_val], y=["Net Change"],
+        mode="markers+text", marker=dict(symbol="diamond", size=14, color=LMDI_COLORS["net"]),
+        text=[f"{_net_val:+,.0f} TJ"], textposition="middle right", textfont=dict(size=12),
         showlegend=False,
+    ))
+    fig_lmdi_bar.add_vline(x=0, line_width=1.5, line_color="black")
+    _n = "4" if USE_LMDI_4FACTOR else "3"
+    apply_theme(fig_lmdi_bar).update_layout(
+        title=f"LMDI-I {_n}-Factor Decomposition — Cumulative Change (2000–{df_lmdi['year'][-1]}, TJ)",
+        xaxis_title="Cumulative ΔE (TJ)", yaxis_title="",
+        yaxis=dict(categoryorder="array", categoryarray=[f[0] for f in _factors] + ["Net Change"]),
+        height=350 if not USE_LMDI_4FACTOR else 400,
+        margin=dict(l=150),
     )
     return
 
 
 @app.cell
-def _(df_lmdi, go):
-    # --- Time series of cumulative effects ---
-    _years_ts = df_lmdi["year"].to_list()
-    _cum_pop = df_lmdi["cum_pop"].to_list()
-    _cum_weather = df_lmdi["cum_weather"].to_list()
-    _cum_intensity = df_lmdi["cum_intensity"].to_list()
-    _cum_total = df_lmdi["cum_total"].to_list()
+def _(LMDI_COLORS, USE_LMDI_4FACTOR, apply_theme, df_lmdi, go):
+    # Diverging stacked bar chart (Energy Policy / Applied Energy convention)
+    _years = df_lmdi["year"].to_list()
+
+    # Define factor series — positive factors first, then negative
+    _bar_series: list[tuple[str, str, str]] = [
+        ("dE_pop", "Population", LMDI_COLORS["population"]),
+    ]
+    if USE_LMDI_4FACTOR:
+        _bar_series.append(("dE_floor", "Floor Area/cap", LMDI_COLORS["floor_area"]))
+    _bar_series.extend([
+        ("dE_weather", "Weather (HDD)", LMDI_COLORS["weather"]),
+        ("dE_intensity", "Intensity (tech.)", LMDI_COLORS["intensity"]),
+    ])
 
     fig_lmdi_ts = go.Figure()
-
+    for _col, _name, _color in _bar_series:
+        fig_lmdi_ts.add_trace(go.Bar(
+            x=_years, y=df_lmdi[_col].to_list(),
+            name=_name, marker_color=_color,
+        ))
+    # Net change overlay as line
     fig_lmdi_ts.add_trace(go.Scatter(
-        x=_years_ts, y=_cum_pop,
-        name="Population",
-        mode="lines+markers",
-        line=dict(color="#F44336", width=2.5),
-        marker=dict(size=4),
+        x=_years, y=df_lmdi["dE_total"].to_list(),
+        name="Net Change", mode="lines+markers",
+        line=dict(color=LMDI_COLORS["net"], width=2.5, dash="dash"),
+        marker=dict(size=5, color=LMDI_COLORS["net"]),
     ))
-    fig_lmdi_ts.add_trace(go.Scatter(
-        x=_years_ts, y=_cum_weather,
-        name="Weather (HDD)",
-        mode="lines+markers",
-        line=dict(color="#2196F3", width=2.5),
-        marker=dict(size=4),
-    ))
-    fig_lmdi_ts.add_trace(go.Scatter(
-        x=_years_ts, y=_cum_intensity,
-        name="Intensity (tech.)",
-        mode="lines+markers",
-        line=dict(color="#4CAF50", width=2.5),
-        marker=dict(size=4),
-    ))
-    fig_lmdi_ts.add_trace(go.Scatter(
-        x=_years_ts, y=_cum_total,
-        name="Net Change",
-        mode="lines+markers",
-        line=dict(color="#212121", width=3, dash="dash"),
-        marker=dict(size=5),
-    ))
-
-    fig_lmdi_ts.add_hline(y=0, line_dash="dot", line_color="gray", opacity=0.5)
-
-    fig_lmdi_ts.update_layout(
-        title="Cumulative LMDI-I Decomposition — Year-by-Year (TJ, base 2000)",
-        xaxis_title="Year",
-        yaxis_title="Cumulative ΔE (TJ)",
-        template="plotly_white",
-        font=dict(size=14),
-        width=1000,
-        height=550,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.22, xanchor="center", x=0.5),
+    fig_lmdi_ts.add_hline(y=0, line_width=1, line_color="black")
+    _n = "4" if USE_LMDI_4FACTOR else "3"
+    apply_theme(fig_lmdi_ts).update_layout(
+        title=f"Annual LMDI-I {_n}-Factor Decomposition (TJ)",
+        xaxis_title="Year", yaxis_title="Annual \u0394E (TJ)",
+        barmode="relative",
+        width=1150,
+        margin=dict(b=110),
+    )
+    fig_lmdi_ts.add_annotation(
+        text="Note: Population and Floor Area effects are small relative to Weather and Intensity.",
+        xref="paper", yref="paper", x=0.5, y=-0.35,
+        showarrow=False, font=dict(size=10, color="#888"),
+        xanchor="center",
     )
     return
 
 
 @app.cell
-def _(df_lmdi, mo):
-    # --- Summary with dynamic numbers ---
+def _(USE_LMDI_4FACTOR, df_lmdi, mo):
     _last_row = df_lmdi[-1]
     _cum_p = _last_row["cum_pop"].item()
     _cum_w = _last_row["cum_weather"].item()
     _cum_i = _last_row["cum_intensity"].item()
     _cum_t = _last_row["cum_total"].item()
 
-    # Shares of the absolute net change (handle sign correctly)
-    _abs_sum = abs(_cum_p) + abs(_cum_w) + abs(_cum_i)
-    _pct_pop = abs(_cum_p) / _abs_sum * 100
-    _pct_weather = abs(_cum_w) / _abs_sum * 100
-    _pct_intensity = abs(_cum_i) / _abs_sum * 100
+    _rows: list[str] = []
+    if USE_LMDI_4FACTOR:
+        _cum_f = _last_row["cum_floor"].item()
+        _abs_sum = abs(_cum_p) + abs(_cum_f) + abs(_cum_w) + abs(_cum_i)
+        _rows.append(f"| **Population** | {_cum_p:+,.0f} | {'Up' if _cum_p > 0 else 'Down'} | {abs(_cum_p)/_abs_sum*100:.0f}% |")
+        _rows.append(f"| **Floor Area/cap** | {_cum_f:+,.0f} | {'Up' if _cum_f > 0 else 'Down'} | {abs(_cum_f)/_abs_sum*100:.0f}% |")
+    else:
+        _abs_sum = abs(_cum_p) + abs(_cum_w) + abs(_cum_i)
+        _rows.append(f"| **Population** | {_cum_p:+,.0f} | {'Up' if _cum_p > 0 else 'Down'} | {abs(_cum_p)/_abs_sum*100:.0f}% |")
+    _rows.append(f"| **Weather (HDD)** | {_cum_w:+,.0f} | {'Up' if _cum_w > 0 else 'Down'} | {abs(_cum_w)/_abs_sum*100:.0f}% |")
+    _rows.append(f"| **Intensity (tech.)** | {_cum_i:+,.0f} | {'Up' if _cum_i > 0 else 'Down'} | {abs(_cum_i)/_abs_sum*100:.0f}% |")
+    _rows.append(f"| **Net Change** | {_cum_t:+,.0f} | {'Up' if _cum_t > 0 else 'Down'} | — |")
 
-    _up_p = "Up" if _cum_p > 0 else "Down"
-    _up_w = "Up" if _cum_w > 0 else "Down"
-    _up_i = "Up" if _cum_i > 0 else "Down"
-    _up_t = "Up" if _cum_t > 0 else "Down"
-    _last_yr = df_lmdi["year"][-1]
-
+    _n = "4" if USE_LMDI_4FACTOR else "3"
+    _table = "\n        ".join(_rows)
     mo.md(
         f"""
-        ### LMDI Summary (2000 to {_last_yr})
+        ### LMDI Summary — {_n}-Factor (2000 to {df_lmdi['year'][-1]})
 
         | Factor | Cumulative dE (TJ) | Direction | Share |
         |--------|--------------------:|-----------|------:|
-        | **Population** | {_cum_p:+,.0f} | {_up_p} | {_pct_pop:.0f}% |
-        | **Weather (HDD)** | {_cum_w:+,.0f} | {_up_w} | {_pct_weather:.0f}% |
-        | **Intensity (tech.)** | {_cum_i:+,.0f} | {_up_i} | {_pct_intensity:.0f}% |
-        | **Net Change** | {_cum_t:+,.0f} | {_up_t} | — |
+        {_table}
 
         **Key insight**: The intensity effect alone ({_cum_i:+,.0f} TJ) is large enough to
         offset **both** population growth ({_cum_p:+,.0f} TJ) **and** would still yield a
-        net decline even without the weather bonus ({_cum_w:+,.0f} TJ). This confirms that
-        **technology and policy — not just climate luck — are driving absolute decoupling**.
+        net decline even without the weather bonus ({_cum_w:+,.0f} TJ).
         """
     )
     return
 
 
-@app.cell
-def _(mo):
-    mo.md("""
-    ---
-    ## 15. HDD-Normalized Household Energy
-
-    Removes year-to-year weather variation to reveal the **structural** trend
-    in household energy consumption. The reference HDD is the 2000-2024 mean.
-    """)
-    return
+# ═══════════════════════════════════════════════════════════════════════
+# 15. HDD-NORMALIZED ENERGY
+# ═══════════════════════════════════════════════════════════════════════
 
 
 @app.cell
-def _(df_hdd, df_hh, get_sh_share, go, pl):
-    # Reference HDD = mean over study period
+def _(apply_theme, df_hdd, df_hh, get_sh_share, go, mo, pl):
     _hdd_ref = df_hdd.filter(pl.col("year").is_between(2000, 2024))["hdd"].mean()
 
     _df_e_yr = (
-        df_hh.group_by("Jahr")
-        .agg(pl.col("TJ").sum().alias("E_hh"))
-        .rename({"Jahr": "year"})
-        .sort("year")
-        .filter(pl.col("year") >= 2000)
+        df_hh.group_by("Jahr").agg(pl.col("TJ").sum().alias("E_hh"))
+        .rename({"Jahr": "year"}).sort("year").filter(pl.col("year") >= 2000)
     )
-    # Apply space-heating share
     _sh = [get_sh_share(y) for y in _df_e_yr["year"].to_list()]
-    _df_e_yr = _df_e_yr.with_columns(
-        (pl.col("E_hh") * pl.Series("_sh", _sh)).alias("E"),
-    )
+    _df_e_yr = _df_e_yr.with_columns((pl.col("E_hh") * pl.Series("_sh", _sh)).alias("E"))
 
     df_hdd_norm = (
         _df_e_yr
         .join(df_hdd.select("year", "hdd"), on="year", how="inner")
-        .with_columns(
-            (pl.col("E") * _hdd_ref / pl.col("hdd")).round(0).alias("E_norm")
-        )
+        .with_columns((pl.col("E") * _hdd_ref / pl.col("hdd")).round(0).alias("E_norm"))
     )
 
     fig_hdd_norm = go.Figure()
     fig_hdd_norm.add_trace(go.Scatter(
-        x=df_hdd_norm["year"].to_list(),
-        y=df_hdd_norm["E"].to_list(),
-        name="Actual",
-        mode="lines+markers",
-        line=dict(color="#90CAF9", width=2),
-        marker=dict(size=5),
+        x=df_hdd_norm["year"].to_list(), y=df_hdd_norm["E"].to_list(),
+        name="Actual", mode="lines+markers", line=dict(color="#90CAF9", width=2), marker=dict(size=5),
     ))
     fig_hdd_norm.add_trace(go.Scatter(
-        x=df_hdd_norm["year"].to_list(),
-        y=df_hdd_norm["E_norm"].to_list(),
-        name=f"HDD-Normalized (ref={_hdd_ref:.0f})",
-        mode="lines+markers",
-        line=dict(color="#1565C0", width=3),
-        marker=dict(size=6),
+        x=df_hdd_norm["year"].to_list(), y=df_hdd_norm["E_norm"].to_list(),
+        name=f"HDD-Normalized (ref={_hdd_ref:.0f})", mode="lines+markers",
+        line=dict(color="#1565C0", width=3), marker=dict(size=6),
     ))
-
-    fig_hdd_norm.update_layout(
+    apply_theme(fig_hdd_norm).update_layout(
         title="Space-Heating Energy — Actual vs HDD-Normalized (TJ)",
-        xaxis_title="Year",
-        yaxis_title="Final Energy (TJ)",
-        template="plotly_white",
-        font=dict(size=14),
-        width=1000,
-        height=550,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.22, xanchor="center", x=0.5),
+        xaxis_title="Year", yaxis_title="Final Energy (TJ)",
     )
     fig_hdd_norm
-    return df_hdd_norm, fig_hdd_norm
 
-
-@app.cell
-def _(df_hdd_norm, mo, pl):
     _e_first = df_hdd_norm.filter(pl.col("year") == df_hdd_norm["year"].min())["E_norm"][0]
     _e_last = df_hdd_norm.filter(pl.col("year") == df_hdd_norm["year"].max())["E_norm"][0]
     _pct = (_e_last - _e_first) / _e_first * 100
+    mo.md(f"**HDD-normalized structural change: {_pct:+.1f}%** from {df_hdd_norm['year'].min()} to {df_hdd_norm['year'].max()}.")
+    return df_hdd_norm, fig_hdd_norm
 
-    mo.md(
-        f"""
-        ### HDD-Normalized Trend
 
-        After removing weather variability, household energy shows a **{_pct:+.1f}%** structural
-        change from {df_hdd_norm['year'].min()} to {df_hdd_norm['year'].max()}.
-        The normalized series is smoother — year-to-year spikes (cold winters) disappear,
-        revealing the underlying efficiency improvement driven by insulation and heat pump adoption.
-        """
+# ═══════════════════════════════════════════════════════════════════════
+# 16. INTENSITY ATTRIBUTION (Qualitative)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+@app.cell
+def _(apply_theme, df_lmdi, go):
+    _total_intensity = df_lmdi[-1]["cum_intensity"].item()
+    # Fixed indicative shares from literature (BFE/Prognos 2024, TEP Energy)
+    _envelope_share = 0.45
+    _fuel_switch_share = 0.35
+    _other_share = 1.0 - _envelope_share - _fuel_switch_share
+    _envelope_pct = round(_envelope_share * 100)
+    _fuel_switch_pct = round(_fuel_switch_share * 100)
+    _other_pct = round(_other_share * 100)
+    _shares = {
+        f"Building Envelope ({_envelope_pct}%)": _envelope_share,
+        f"Fuel Switching ({_fuel_switch_pct}%)": _fuel_switch_share,
+        f"Other ({_other_pct}%)": _other_share,
+    }
+
+    fig_intensity_attr = go.Figure(go.Bar(
+        y=["Total Intensity Effect"] + list(_shares.keys()),
+        x=[_total_intensity] + [_total_intensity * s for s in _shares.values()],
+        orientation="h",
+        marker_color=["#1565C0", "#4CAF50", "#FF9800", "#9E9E9E"],
+        text=[f"{_total_intensity * s:,.0f} TJ" if i > 0 else f"{_total_intensity:,.0f} TJ"
+              for i, s in enumerate([1.0] + list(_shares.values()))],
+        textposition="auto",
+    ))
+    apply_theme(fig_intensity_attr).update_layout(
+        title="Intensity Effect \u2014 Attribution (indicative)",
+        xaxis_title="\u0394E (TJ, cumulative 2000\u2013latest)",
+        yaxis=dict(autorange="reversed"), height=400,
+        margin=dict(l=180),
     )
-    return
+    fig_intensity_attr
+    return (fig_intensity_attr,)
 
 
 @app.cell
 def _(mo):
     mo.md("""
-    ---
-    ## 16. Intensity Sub-Decomposition (Qualitative)
+    ## Building Envelope & Renovation Context
 
-    The 3-factor LMDI lumps envelope improvement, fuel switching, and floor-area
-    effects into a single "intensity" residual. Here we estimate the approximate
-    contribution of each sub-driver.
+    The intensity effect is the dominant driver of space-heating
+    energy reduction. We decompose it qualitatively into three channels:
 
-    **This is an indicative attribution, not a formal decomposition.**
+    ### 1. Building Envelope Improvements (~45%)
+
+    Switzerland's building renovation rate stands at approximately **1.1% per year**
+    (TEP Energy, 2020), well below the **2.0--2.5%** needed to meet the 2050 net-zero
+    target (BFE *Energieperspektiven 2050+*). At the current pace, full stock turnover
+    would take roughly 90 years.
+
+    Reference thermal performance by construction period (GEAK/CECB database):
+
+    | Construction Period | Typical U-value (W/m\u00b2K) | Specific Heating Demand (kWh/m\u00b2) |
+    |---|---|---|
+    | Pre-1970 | 0.8--1.0 | 170--200 |
+    | 1970--1990 | 0.5--0.8 | 100--150 |
+    | 1990--2010 | 0.3--0.5 | 60--100 |
+    | Post-2010 (MuKEn 2014) | 0.15--0.25 | 30--50 |
+    | Minergie-P target | \u22640.15 | \u226416 (SIA 380/1) |
+
+    **Why not a formal LMDI factor?** We investigated adding insulation as a 5th
+    decomposition factor but concluded it would be methodologically unsound:
+
+    - No consistent annual time series of stock-level U-values exists for Switzerland.
+    - The *Energiebezugsfl\u00e4che* (EBF) definition changed with SIA 380/1 (2007),
+      making pre/post comparisons unreliable.
+    - The intensity factor in our 4-factor LMDI already captures envelope improvements
+      implicitly -- adding a separate insulation factor would create multicollinearity.
+
+    ### 2. Fuel Switching (~35%)
+
+    The shift from oil/gas boilers (efficiency ~85--95%) to heat pumps (COP 3--4)
+    reduces final energy consumption per unit of useful heat by a factor of roughly 3.
+    This is captured in the heating mix transition (fig4) and the building-level
+    analysis (fig15).
+
+    ### 3. Other Efficiency Gains (~20%)
+
+    Includes improved controls (thermostatic valves, weather-compensated heating curves),
+    reduced distribution losses, and behavioral changes.
+
+    ### Regulatory Timeline
+
+    - **SIA 380/1 (2007 update)**: Standardized thermal energy calculation method;
+      introduced the *Energiebezugsfl\u00e4che* (EBF) definition.
+    - **MuKEn 2014**: Cantonal model energy codes -- now adopted in 22/26 cantons.
+      Mandates roughly 10% renewable share on heating system replacement.
+    - **MuKEn 2025**: Adopted August 2025 -- tighter envelope requirements,
+      implementation 2025--2030.
     """)
     return
 
 
-@app.cell
-def _(df_lmdi, go):
-    # Approximate attribution of the intensity effect
-    _total_intensity = df_lmdi[-1]["cum_intensity"].item()
-
-    _envelope_share = 0.45
-    _fuel_switch_share = 0.35
-    _other_share = 1.0 - _envelope_share - _fuel_switch_share
-
-    _envelope_tj = _total_intensity * _envelope_share
-    _fuel_switch_tj = _total_intensity * _fuel_switch_share
-    _other_tj = _total_intensity * _other_share
-
-    fig_intensity_attr = go.Figure(go.Bar(
-        y=["Total Intensity Effect",
-           "Building Envelope (~45%)",
-           "Fuel Switching (~35%)",
-           "Other (~20%)"],
-        x=[_total_intensity, _envelope_tj, _fuel_switch_tj, _other_tj],
-        orientation="h",
-        marker_color=["#1565C0", "#4CAF50", "#FF9800", "#9E9E9E"],
-        text=[
-            f"{_total_intensity:,.0f} TJ",
-            f"{_envelope_tj:,.0f} TJ",
-            f"{_fuel_switch_tj:,.0f} TJ",
-            f"{_other_tj:,.0f} TJ",
-        ],
-        textposition="auto",
-    ))
-    fig_intensity_attr.update_layout(
-        title="Approximate Attribution of the Intensity Effect (indicative)",
-        xaxis_title="\u0394E (TJ, cumulative 2000\u2013latest)",
-        template="plotly_white",
-        font=dict(size=14),
-        width=900,
-        height=400,
-        yaxis=dict(autorange="reversed"),
-    )
-    fig_intensity_attr
-    return (fig_intensity_attr,)
+# ═══════════════════════════════════════════════════════════════════════
+# 17. MONTE CARLO SCENARIOS
+# ═══════════════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -2047,187 +1865,86 @@ def _(mo):
 
 
 @app.cell
-def _(df_lmdi_input, go, pl):
-    import numpy as _np_mc
+def _(
+    DEFAULT_SCENARIOS,
+    apply_theme,
+    compute_named_trajectories,
+    compute_tornado_sensitivity,
+    df_lmdi_input,
+    df_pop_proj,
+    extract_base_values,
+    go,
+    pl,
+    run_monte_carlo,
+):
+    _base = extract_base_values(df_lmdi_input)
+    _mc = run_monte_carlo(_base, pop_projections=df_pop_proj)
+    _named = compute_named_trajectories(_base, pop_projections=df_pop_proj)
 
-    _rng = _np_mc.random.default_rng(42)
-    _n_sims = 1000
-    _years_proj = list(range(2025, 2051))
-    _n_years = len(_years_proj)
-
-    # --- Baseline values from last observed year ---
-    _last_obs = df_lmdi_input.filter(pl.col("year") == df_lmdi_input["year"].max())
-    _E_base = _last_obs["E"].item()
-    _P_base = _last_obs["population"].item()
-    _HDD_base = _last_obs["hdd"].item()
-    _I_base = _last_obs["intensity"].item()
-
-    # BFS reference population trajectory → 10.5M by 2055
-    _pop_2055 = 10_500_000
-    _pop_slope = (_pop_2055 - _P_base) / (2055 - 2024)
-
-    # --- Named scenario definitions ---
-    _scenarios = {
-        "BAU": {"reno_rate": 0.010, "label": "BAU (1% reno)", "color": "#FF9800"},
-        "Accelerated": {"reno_rate": 0.020, "label": "Accelerated (2% reno)", "color": "#2196F3"},
-        "Ambitious": {"reno_rate": 0.030, "label": "Ambitious (3% reno)", "color": "#4CAF50"},
-    }
-
-    # --- Monte Carlo simulation ---
-    _all_trajectories = _np_mc.zeros((_n_sims, _n_years))
-
-    for _sim in range(_n_sims):
-        _reno = _rng.uniform(0.008, 0.032)
-        _hdd_decline_per_yr = _rng.normal(-0.0025, 0.001)
-        _pop_noise = _rng.normal(0, 100_000)
-        # Intensity decline = base 1.0%/yr + reno contribution
-        _intensity_decline = 0.010 + _reno * 0.5
-
-        for _yr_idx, _yr in enumerate(_years_proj):
-            _dt = _yr - 2024
-            _P_t = _P_base + _pop_slope * _dt + _pop_noise
-            _HDD_t = _HDD_base * (1 + _hdd_decline_per_yr) ** _dt
-            _I_t = _I_base * (1 - _intensity_decline) ** _dt
-            _all_trajectories[_sim, _yr_idx] = _P_t * _HDD_t * _I_t
-
-    # Percentiles
-    _p10 = _np_mc.percentile(_all_trajectories, 10, axis=0)
-    _p25 = _np_mc.percentile(_all_trajectories, 25, axis=0)
-    _p50 = _np_mc.percentile(_all_trajectories, 50, axis=0)
-    _p75 = _np_mc.percentile(_all_trajectories, 75, axis=0)
-    _p90 = _np_mc.percentile(_all_trajectories, 90, axis=0)
-
-    # Named scenario trajectories (deterministic)
-    _named_trajs = {}
-    for _sname, _sp in _scenarios.items():
-        _traj = []
-        for _yr in _years_proj:
-            _dt = _yr - 2024
-            _P_s = _P_base + _pop_slope * _dt
-            _HDD_s = _HDD_base * (1 - 0.0025) ** _dt
-            _I_s = _I_base * (1 - (0.010 + _sp["reno_rate"] * 0.5)) ** _dt
-            _traj.append(_P_s * _HDD_s * _I_s)
-        _named_trajs[_sname] = _traj
-
-    # --- Fan chart ---
+    # Fan chart
     fig_scenario_fan = go.Figure()
-
-    # Uncertainty bands
     fig_scenario_fan.add_trace(go.Scatter(
-        x=_years_proj + _years_proj[::-1],
-        y=_p90.tolist() + _p10[::-1].tolist(),
+        x=_mc["years"] + _mc["years"][::-1],
+        y=_mc["p90"].tolist() + _mc["p10"][::-1].tolist(),
         fill="toself", fillcolor="rgba(158,158,158,0.15)",
-        line=dict(width=0), name="10th\u201390th pctile", showlegend=True,
+        line=dict(width=0), name="10th–90th pctile",
     ))
     fig_scenario_fan.add_trace(go.Scatter(
-        x=_years_proj + _years_proj[::-1],
-        y=_p75.tolist() + _p25[::-1].tolist(),
+        x=_mc["years"] + _mc["years"][::-1],
+        y=_mc["p75"].tolist() + _mc["p25"][::-1].tolist(),
         fill="toself", fillcolor="rgba(158,158,158,0.30)",
-        line=dict(width=0), name="25th\u201375th pctile", showlegend=True,
+        line=dict(width=0), name="25th–75th pctile",
     ))
-
-    # Named scenarios
-    for _sname, _traj in _named_trajs.items():
+    for _sname, _traj in _named.items():
+        _sdef = DEFAULT_SCENARIOS[_sname]
         fig_scenario_fan.add_trace(go.Scatter(
-            x=_years_proj, y=_traj,
-            name=_scenarios[_sname]["label"], mode="lines",
-            line=dict(color=_scenarios[_sname]["color"], width=3),
+            x=_mc["years"], y=_traj,
+            name=_sdef.label, mode="lines",
+            line=dict(color=_sdef.color, width=3),
         ))
 
-    # Historical for context
-    _hist = df_lmdi_input.filter(pl.col("year") >= 2010)
+    # Historical energy — full series so the trend into projections is visible
     fig_scenario_fan.add_trace(go.Scatter(
-        x=_hist["year"].to_list(), y=_hist["E"].to_list(),
+        x=df_lmdi_input["year"].to_list(), y=df_lmdi_input["E"].to_list(),
         name="Historical", mode="lines+markers",
-        line=dict(color="#212121", width=2, dash="dot"), marker=dict(size=4),
+        line=dict(color="#212121", width=3), marker=dict(size=4),
     ))
-
-    fig_scenario_fan.update_layout(
-        title="Projected Space-Heating Energy Demand \u2014 Monte Carlo Scenarios (TJ)",
-        xaxis_title="Year",
-        yaxis_title="Final Energy (TJ)",
-        template="plotly_white",
-        font=dict(size=14),
-        width=1050,
-        height=600,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
+    apply_theme(fig_scenario_fan).update_layout(
+        title="Projected Space-Heating Energy Demand — Monte Carlo Scenarios (TJ)",
+        xaxis_title="Year", yaxis_title="Final Energy (TJ)",
     )
-    fig_scenario_fan
-    return (fig_scenario_fan,)
 
-
-@app.cell
-def _(df_lmdi_input, go, pl):
-    import numpy as _np_mc
-
-    _last_obs = df_lmdi_input.filter(pl.col("year") == df_lmdi_input["year"].max())
-    _P_base = _last_obs["population"].item()
-    _HDD_base = _last_obs["hdd"].item()
-    _I_base = _last_obs["intensity"].item()
-    _pop_2055 = 10_500_000
-    _pop_slope = (_pop_2055 - _P_base) / (2055 - 2024)
-
-    # Median trajectory for baseline comparison
-    _rng = _np_mc.random.default_rng(42)
-    _n_sims = 1000
-    _all_trajs = _np_mc.zeros((_n_sims, 26))
-    for _sim in range(_n_sims):
-        _reno = _rng.uniform(0.008, 0.032)
-        _hdd_decline = _rng.normal(-0.0025, 0.001)
-        _pop_noise = _rng.normal(0, 100_000)
-        _int_decline = 0.010 + _reno * 0.5
-        for _yi in range(26):
-            _dt = _yi + 1
-            _P_t = _P_base + _pop_slope * _dt + _pop_noise
-            _H_t = _HDD_base * (1 + _hdd_decline) ** _dt
-            _I_t = _I_base * (1 - _int_decline) ** _dt
-            _all_trajs[_sim, _yi] = _P_t * _H_t * _I_t
-    _base_2050 = _np_mc.percentile(_all_trajs, 50, axis=0)[-1]
-
-    # --- Tornado chart: OAT sensitivity at 2050 ---
-    _sensitivities = []
-    # Population: +/- 500k
-    for _lbl, _dp in [("Population +500k", 500_000), ("Population \u2212500k", -500_000)]:
-        _P = _P_base + _pop_slope * 26 + _dp
-        _H = _HDD_base * (1 - 0.0025) ** 26
-        _I = _I_base * (1 - 0.020) ** 26
-        _sensitivities.append((_lbl, _P * _H * _I - _base_2050))
-
-    # HDD decline: slow vs fast
-    for _lbl, _rate in [("HDD decline \u22121.5%/dec", -0.0015), ("HDD decline \u22123.5%/dec", -0.0035)]:
-        _P = _P_base + _pop_slope * 26
-        _H = _HDD_base * (1 + _rate) ** 26
-        _I = _I_base * (1 - 0.020) ** 26
-        _sensitivities.append((_lbl, _P * _H * _I - _base_2050))
-
-    # Renovation rate: 1% vs 3%
-    for _lbl, _reno in [("Reno rate 1.0%/yr", 0.010), ("Reno rate 3.0%/yr", 0.030)]:
-        _P = _P_base + _pop_slope * 26
-        _H = _HDD_base * (1 - 0.0025) ** 26
-        _I = _I_base * (1 - (0.010 + _reno * 0.5)) ** 26
-        _sensitivities.append((_lbl, _P * _H * _I - _base_2050))
-
-    _sensitivities.sort(key=lambda x: abs(x[1]), reverse=True)
+    # Tornado sensitivity
+    _median_2050 = float(_mc["p50"][-1])
+    _sensitivities = compute_tornado_sensitivity(_base, _median_2050)
 
     fig_tornado = go.Figure(go.Bar(
-        y=[_s[0] for _s in _sensitivities],
-        x=[_s[1] for _s in _sensitivities],
+        y=[s[0] for s in _sensitivities],
+        x=[s[1] for s in _sensitivities],
         orientation="h",
-        marker_color=["#F44336" if _s[1] > 0 else "#4CAF50" for _s in _sensitivities],
-        text=[f"{_s[1]:+,.0f} TJ" for _s in _sensitivities],
-        textposition="auto",
+        marker_color=["#F44336" if s[1] > 0 else "#4CAF50" for s in _sensitivities],
+        text=[f"{s[1]:+,.0f} TJ" for s in _sensitivities],
+        textposition="inside",
+        insidetextanchor="end",
+        textfont=dict(size=12, color="white"),
+        constraintext="none",
     ))
-    fig_tornado.update_layout(
-        title="Sensitivity of 2050 Energy Demand to Parameter Changes (vs Median)",
-        xaxis_title="\u0394E at 2050 (TJ vs median)",
-        template="plotly_white",
-        font=dict(size=14),
-        width=900,
-        height=450,
-        yaxis=dict(autorange="reversed"),
+    _tornado_max = max(abs(s[1]) for s in _sensitivities) * 1.15
+    apply_theme(fig_tornado).update_layout(
+        title="Tornado Sensitivity \u2014 2050 Energy Demand vs Median",
+        xaxis_title="\u0394E vs Median (TJ)",
+        xaxis=dict(range=[-_tornado_max, _tornado_max]),
+        yaxis=dict(autorange="reversed"), height=450,
+        margin=dict(l=180, t=80),
     )
-    fig_tornado
-    return (fig_tornado,)
+
+    fig_scenario_fan
+    return fig_scenario_fan, fig_tornado
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 18. HEATING SYSTEM ECONOMICS
+# ═══════════════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -2240,126 +1957,147 @@ def _(mo):
     (120 kWh/m²/yr demand). Shows how the CO₂ levy shifts the economic calculus
     between fossil boilers and heat pumps.
 
-    **Operating cost** = fuel + CO₂ levy. **Total cost of ownership** also includes
-    annualized investment (net of Gebäudeprogramm subsidies, 20-year lifetime, 3% discount).
+    ### The Swiss CO₂ Levy Mechanism
+
+    The CO₂ levy (*CO₂-Abgabe*) is a Pigouvian tax on **fossil heating fuels**
+    (heating oil, natural gas) collected at the point of import or production.
+    It does **not** apply to transport fuels or electricity — meaning heat pumps
+    are structurally exempt on the operating-cost side.
+
+    Revenue is recycled through two channels:
+    - **~2/3** redistributed to the population via per-capita health-insurance
+      premium reductions (lump-sum rebate), making it progressive.
+    - **~1/3** channelled to the *Gebäudeprogramm*, which co-finances envelope
+      retrofits and heating-system replacements (reflected in our CAPEX subsidies).
+
+    ### Three Scenario Levels — Rationale
+
+    We evaluate costs under three levy levels that span the plausible policy
+    corridor from today's law through to full externality pricing:
+
+    | Scenario | Level | Justification |
+    |----------|-------|---------------|
+    | **Status quo** | CHF 120/t | Current rate since 1 Jan 2022. Set by the CO₂ Act (SR 641.71) and CO₂ Ordinance (SR 641.711, Art. 94a). The levy has escalated stepwise from CHF 12/t in 2008 each time the buildings sector missed its interim CO₂ reduction targets. |
+    | **Policy trajectory** | CHF 200/t | The revised CO₂ Act (2025–2030) authorises a ceiling of CHF 210/t, with automatic escalation if buildings miss the 2026/2028 interim targets. This is consistent with the EU ETS price trajectory under the Fit-for-55 package and is the mid-range assumption used by BFE *Energieperspektiven 2050+* and Prognos/TEP Energy. |
+    | **Full externality** | CHF 300/t | Aligns with IPCC AR6 WGIII carbon prices for 1.5 °C-compatible pathways (median USD 220–350/t CO₂ by 2030, Table 3.6). Supported by the US EPA (2023) social cost of carbon estimates and Rennert et al. (2022, *Nature*). Represents the cost if the levy fully internalised the climate-damage externality. |
+
+    This **status quo / policy trajectory / full cost internalisation** bracket is
+    standard methodology in Swiss energy-policy analysis (BFE, BAFU, Prognos/TEP Energy)
+    and allows the reader to assess how sensitive the fossil-vs-HP cost comparison is
+    to the regulatory trajectory.
     """)
     return
 
 
 @app.cell
-def _(go):
-    # Reference building: 150 m², unrenovated (120 kWh/m²/yr useful demand)
-    _area = 150
-    _demand = 120  # kWh/m²/yr
+def _(CO2_LEVY_SCENARIOS, DEFAULT_SYSTEMS, apply_theme, compute_opex, compute_totex, go, make_subplots):
+    # TOTEX stacked bars across CO₂ levy scenarios
+    _levies = list(CO2_LEVY_SCENARIOS.keys())
+    _systems = list(DEFAULT_SYSTEMS.keys())
+    _n_sys = len(_systems)
 
-    _systems = {
-        "Oil Boiler": {"eff": 0.90, "fuel_chf_kwh": 0.12, "co2_kg_kwh": 0.265, "color": "#8B4513"},
-        "Gas Condensing": {"eff": 0.95, "fuel_chf_kwh": 0.11, "co2_kg_kwh": 0.198, "color": "#FF6B35"},
-        "Air-Source HP": {"eff": 3.2, "fuel_chf_kwh": 0.27, "co2_kg_kwh": 0.0, "color": "#2196F3"},
-        "Ground-Source HP": {"eff": 4.0, "fuel_chf_kwh": 0.27, "co2_kg_kwh": 0.0, "color": "#1565C0"},
-    }
-
-    _co2_levies = [120, 200, 300]
-
-    _results = []
-    for _sname, _s in _systems.items():
-        for _levy in _co2_levies:
-            _final_energy = _area * _demand / _s["eff"]  # kWh delivered
-            _fuel_cost = _final_energy * _s["fuel_chf_kwh"]
-            _co2_cost = _final_energy * _s["co2_kg_kwh"] / 1000 * _levy
-            _results.append({
-                "system": _sname,
-                "levy": f"CHF {_levy}/t",
-                "total_chf": _fuel_cost + _co2_cost,
-            })
-
-    fig_cost = go.Figure()
-    _opacities = [0.55, 0.75, 0.95]
-    for _li, _levy in enumerate(_co2_levies):
-        _levy_str = f"CHF {_levy}/t"
-        _filtered = [_r for _r in _results if _r["levy"] == _levy_str]
-        fig_cost.add_trace(go.Bar(
-            x=[_r["system"] for _r in _filtered],
-            y=[_r["total_chf"] for _r in _filtered],
-            name=f"CO\u2082 levy {_levy_str}",
-            text=[f"CHF {_r['total_chf']:,.0f}" for _r in _filtered],
-            textposition="auto",
-            marker_color=[_systems[_r["system"]]["color"] for _r in _filtered],
-            opacity=_opacities[_li],
-        ))
-
-    fig_cost.update_layout(
-        title=dict(
-            text=f"Annual Heating Cost \u2014 150 m\u00b2 Unrenovated House ({_demand} kWh/m\u00b2/yr)"
-                 "<br><sup>Fuel + CO\u2082 levy only \u2014 HP electricity is levy-exempt (Swiss grid ~25 g CO\u2082/kWh)</sup>",
-        ),
-        xaxis_title="Heating System",
-        yaxis_title="Annual Cost (CHF)",
-        barmode="group",
-        template="plotly_white",
-        font=dict(size=14),
-        width=1000,
-        height=550,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.18, xanchor="center", x=0.5),
+    fig_cost = make_subplots(
+        rows=1, cols=len(_levies), shared_yaxes=True,
+        subplot_titles=[f"CO\u2082 levy CHF {l}/t" for l in _levies],
+        horizontal_spacing=0.08,
     )
+
+    for _li, _levy in enumerate(_levies):
+        _col = _li + 1
+        _capex, _fuel, _co2, _totals = [], [], [], []
+        for _sys in DEFAULT_SYSTEMS.values():
+            _t = compute_totex(_sys, _levy)
+            _o = compute_opex(_sys, _levy)
+            _capex.append(_t["annual_capex"])
+            _fuel.append(_o["fuel_cost"])
+            _co2.append(_o["co2_cost"])
+            _totals.append(_t["total_totex"])
+
+        _show = _li == 0  # legend only on first subplot
+        fig_cost.add_trace(go.Bar(
+            x=_systems, y=_capex, name="CAPEX (annualized)",
+            marker_color="#78909C", showlegend=_show,
+            text=[f"{v:,.0f}" for v in _capex], textposition="inside",
+            textfont=dict(color="white", size=10),
+        ), row=1, col=_col)
+        fig_cost.add_trace(go.Bar(
+            x=_systems, y=_fuel, name="Fuel",
+            marker_color="#FF9800", showlegend=_show,
+            text=[f"{v:,.0f}" for v in _fuel], textposition="inside",
+            textfont=dict(color="white", size=10),
+        ), row=1, col=_col)
+        fig_cost.add_trace(go.Bar(
+            x=_systems, y=_co2, name="CO₂ levy",
+            marker_color="#F44336", showlegend=_show,
+            text=[f"{v:,.0f}" if v > 0 else "" for v in _co2], textposition="inside",
+            textfont=dict(color="white", size=10),
+        ), row=1, col=_col)
+        for _i, (_s, _t) in enumerate(zip(_systems, _totals)):
+            fig_cost.add_annotation(
+                x=_s, y=_t, text=f"<b>{_t:,.0f}</b>",
+                showarrow=False, yshift=12, font=dict(size=10),
+                xref=f"x{_col}" if _col > 1 else "x",
+                yref=f"y{_col}" if _col > 1 else "y",
+            )
+
+    apply_theme(fig_cost).update_layout(
+        title=dict(
+            text=(
+                "Annual TOTEX \u2014 150 m\u00b2 Unrenovated House (CHF/yr)"
+                "<br><sup style='color:#666'>CAPEX annualized over 20 yr at 3 %, "
+                "net of Geb\u00e4udeprogramm subsidies</sup>"
+            ),
+            y=0.96,
+            x=0.5,
+            xanchor="center",
+        ),
+        barmode="stack", height=620, width=1350,
+        margin=dict(l=70, r=50, t=110, b=80),
+    )
+    fig_cost.update_yaxes(title_text="Annual Cost (CHF/yr)", row=1, col=1)
+    fig_cost.update_xaxes(tickangle=-25)
+    fig_cost
     return (fig_cost,)
 
 
 @app.cell
-def _(mo):
-    # Investment costs and subsidies — Total Cost of Ownership
-    # Sources:
-    #   Investment: EnergieSchweiz "Heizungsersatz: Kosten" (EFH reference case, Bern)
-    #     https://www.energieschweiz.ch/stories/erneuerung-der-heizung-zu-erwartende-kosten/
-    #   HP costs: hausinfo.ch "Kosten einer Wärmepumpe in der Schweiz"
-    #     https://hausinfo.ch/de/bauen-renovieren/haustechnik-vernetzung/heizung-lueftung-klima/waermepumpen/investitionskosten.html
-    #   Subsidies: hausinfo.ch "Heizungsersatz: Finanzierung & Förderung" — average cantonal amounts
-    #     https://hausinfo.ch/de/bauen-renovieren/haustechnik-vernetzung/heizung-lueftung-klima/oelheizung-ersetzen/heizungsersatz-finanzierung.html
-    #   Fossil systems: EnergieSchweiz reference case (oil ~15-20k, gas ~18-22k)
+def _(CO2_LEVY_SCENARIOS, DEFAULT_SYSTEMS, annuity_factor, compute_opex, mo):
     _lifetime = 20
     _r = 0.03
-    _annuity = _r / (1 - (1 + _r) ** (-_lifetime))
+    _af = annuity_factor(_r, _lifetime)
 
-    _tco = {
-        "Oil Boiler":      {"invest": 18_000, "subsidy": 0,      "op": 3036},
-        "Gas Condensing":  {"invest": 20_000, "subsidy": 0,      "op": 2534},
-        "Air-Source HP":   {"invest": 42_000, "subsidy": 5_000,  "op": 1519},
-        "Ground-Source HP":{"invest": 60_000, "subsidy": 10_000, "op": 1215},
-    }
     _rows = []
-    for _name, _v in _tco.items():
-        _net_invest = _v["invest"] - _v["subsidy"]
-        _annual_invest = round(_net_invest * _annuity)
-        _total = _v["op"] + _annual_invest
+    for _name, _sys in DEFAULT_SYSTEMS.items():
+        _opex = compute_opex(_sys, 120)  # current levy
+        _net_invest = _sys.invest_chf - _sys.subsidy_chf
+        _annual_invest = round(_net_invest * _af)
+        _total = _opex["total_opex"] + _annual_invest
         _rows.append(
-            f"| {_name} | {_v['invest']:,} | {_v['subsidy']:,} "
-            f"| {_net_invest:,} | {_annual_invest:,} | {_v['op']:,} | **{_total:,}** |"
+            f"| {_name} | {_sys.invest_chf:,} | {_sys.subsidy_chf:,} "
+            f"| {_net_invest:,} | {_annual_invest:,} | {_opex['total_opex']:,.0f} | **{_total:,.0f}** |"
         )
-
-    _table_rows = "\n        ".join(_rows)
 
     mo.md(
         f"""
-        ### Total Cost of Ownership (at current CO\u2082 levy CHF 120/t)
+        ### Total Cost of Ownership (at current CO₂ levy CHF 120/t)
 
         | System | Investment (CHF) | Subsidy | Net invest | Annual invest | Annual operating | **Annual TCO** |
         |--------|--:|--:|--:|--:|--:|--:|
-        {_table_rows}
+        {chr(10).join("        " + r for r in _rows)}
 
-        **Sources & assumptions:**
-        - Investment costs: [EnergieSchweiz — Heizungsersatz: Kosten](https://www.energieschweiz.ch/stories/erneuerung-der-heizung-zu-erwartende-kosten/) (EFH reference case);
-          [hausinfo.ch — Kosten einer W\u00e4rmepumpe](https://hausinfo.ch/de/bauen-renovieren/haustechnik-vernetzung/heizung-lueftung-klima/waermepumpen/investitionskosten.html)
-        - Subsidies: average cantonal Geb\u00e4udeprogramm amounts (~CHF 5k air-source, ~CHF 10k ground-source with borehole);
-          [hausinfo.ch — Heizungsersatz Finanzierung](https://hausinfo.ch/de/bauen-renovieren/haustechnik-vernetzung/heizung-lueftung-klima/oelheizung-ersetzen/heizungsersatz-finanzierung.html)
-        - 20-year lifetime, 3% real discount rate. Operating costs from the cost-comparison chart above (fuel + CO\u2082 levy at CHF 120/t).
+        Lifetime: {_lifetime} years, discount rate: {_r:.0%}. Operating costs = fuel + CO₂ levy.
 
         Even including the higher upfront cost, **heat pumps reach near-parity with fossil systems**
-        on a total-cost-of-ownership basis thanks to their COP advantage (3\u20134\u00d7 less final
-        energy) and zero CO\u2082 levy exposure. At higher levy levels (CHF 200\u2013300/t),
-        heat pumps become clearly cheaper.
+        on a total-cost-of-ownership basis thanks to their COP advantage (3–4× less final
+        energy) and zero CO₂ levy exposure.
         """
     )
     return
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# FIGURE EXPORT
+# ═══════════════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -2373,6 +2111,17 @@ def _(mo):
 
 @app.cell
 def _(
+    BUILDING_HEAT_COLORS,
+    CARRIER_COLORS,
+    CARRIER_MAP,
+    DECOUPLE_SERIES,
+    FIGURES_DIR,
+    LMDI_COLORS,
+    MIX_CARRIERS,
+    MIX_COLORS,
+    MIX_LABELS,
+    USE_LMDI_4FACTOR,
+    apply_theme,
     df_floor_area,
     df_hdd,
     df_heating_compare,
@@ -2381,432 +2130,141 @@ def _(
     df_lmdi,
     df_mix,
     df_pop_full,
+    df_pop_proj,
+    export_fig,
     go,
     pl,
 ):
-    from pathlib import Path as _Path
-
-    _export_app_path = _Path(__file__).resolve()
-    _proj_root = _export_app_path.parent.parent if _export_app_path.parent.name == "notebooks" else _export_app_path.parent
-    _FIGURES_DIR = _proj_root / "figures"
-    _FIGURES_DIR.mkdir(exist_ok=True)
-
-    _exported_files = []
-
-    def _export_fig(fig, name):
-        """Export a figure as SVG and PDF, printing confirmation."""
-        for _ext in ("svg", "pdf"):
-            _out = _FIGURES_DIR / f"{name}.{_ext}"
-            fig.write_image(str(_out), width=1000, height=550)
-            _exported_files.append(str(_out))
-        print(f"  Exported {name}.svg + {name}.pdf")
-
-    # ------------------------------------------------------------------
-    # 1. Household energy by carrier — stacked area
-    # ------------------------------------------------------------------
-    _carrier_map = {
-        "Erdölprodukte": "Petroleum Products",
-        "Elektrizität": "Electricity",
-        "Gas": "Natural Gas",
-        "Holzenergie": "Wood / Biomass",
-        "Fernwärme": "District Heating",
-        "Kohle": "Coal",
-        "Uebrige erneuerbare Energien": "Other Renewables",
-        "Müll und Industrieabfälle": "Waste",
-    }
-    _carrier_colors = {
-        "Petroleum Products": "#8B4513",
-        "Natural Gas": "#FF6B35",
-        "Electricity": "#FFC107",
-        "Wood / Biomass": "#4CAF50",
-        "District Heating": "#9C27B0",
-        "Other Renewables": "#00BCD4",
-        "Coal": "#607D8B",
-        "Waste": "#795548",
-    }
-
-    _df_hh_plot = df_hh.with_columns(
-        pl.col("Energietraeger").replace(_carrier_map).alias("carrier_en")
-    )
-    _df_pivot = (
-        _df_hh_plot
-        .group_by(["Jahr", "carrier_en"])
-        .agg(pl.col("TJ").sum())
-        .sort("Jahr")
-    )
-    _carrier_totals = (
-        _df_pivot.group_by("carrier_en")
-        .agg(pl.col("TJ").sum().alias("total"))
-        .sort("total", descending=True)
-    )
-    _ordered_carriers = _carrier_totals["carrier_en"].to_list()
+    # ── fig1: Energy by carrier ──
+    _df_hh_plot = df_hh.with_columns(pl.col("Energietraeger").replace(CARRIER_MAP).alias("carrier_en"))
+    _df_pivot = _df_hh_plot.group_by(["Jahr", "carrier_en"]).agg(pl.col("TJ").sum()).sort("Jahr")
+    _ordered = _df_pivot.group_by("carrier_en").agg(pl.col("TJ").sum().alias("total")).sort("total", descending=True)["carrier_en"].to_list()
 
     _fig1 = go.Figure()
-    for _c in _ordered_carriers:
+    for _c in _ordered:
         _sub = _df_pivot.filter(pl.col("carrier_en") == _c).sort("Jahr")
-        _fig1.add_trace(go.Scatter(
-            x=_sub["Jahr"].to_list(),
-            y=_sub["TJ"].to_list(),
-            name=_c,
-            mode="lines",
-            stackgroup="one",
-            line=dict(width=0.5, color=_carrier_colors.get(_c, "#999")),
-        ))
-    _fig1.update_layout(
-        title="Swiss Household Final Energy Consumption by Carrier (TJ)",
-        xaxis_title="Year",
-        yaxis_title="Final Energy (TJ)",
-        template="plotly_white",
-        font=dict(size=14),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
-    )
-    _export_fig(_fig1, "fig1_energy_by_carrier")
+        _fig1.add_trace(go.Scatter(x=_sub["Jahr"].to_list(), y=_sub["TJ"].to_list(), name=_c, mode="lines", stackgroup="one", line=dict(width=0.5, color=CARRIER_COLORS.get(_c, "#999"))))
+    apply_theme(_fig1).update_layout(title="Swiss Household Final Energy Consumption by Carrier (TJ)", xaxis_title="Year", yaxis_title="Final Energy (TJ)")
+    export_fig(_fig1, "fig1_energy_by_carrier", FIGURES_DIR)
 
-    # ------------------------------------------------------------------
-    # 2. HDD scatter with trendline
-    # ------------------------------------------------------------------
-    _years_hdd = df_hdd["year"].to_list()
-    _hdds = df_hdd["hdd"].to_list()
-
-    _n = len(_years_hdd)
-    _sum_x = sum(_years_hdd)
-    _sum_y = sum(_hdds)
-    _sum_xy = sum(_x * _y for _x, _y in zip(_years_hdd, _hdds))
-    _sum_x2 = sum(_x * _x for _x in _years_hdd)
-    _slope = (_n * _sum_xy - _sum_x * _sum_y) / (_n * _sum_x2 - _sum_x * _sum_x)
-    _intercept = (_sum_y - _slope * _sum_x) / _n
-    _trend_y = [_slope * _yr + _intercept for _yr in _years_hdd]
-    _decline_per_decade = _slope * 10
-
+    # ── fig2: HDD trend ──
+    _yrs = df_hdd["year"].to_list(); _hdds = df_hdd["hdd"].to_list()
+    _n = len(_yrs); _sx = sum(_yrs); _sy = sum(_hdds); _sxy = sum(x*y for x,y in zip(_yrs,_hdds)); _sx2 = sum(x*x for x in _yrs)
+    _sl = (_n*_sxy - _sx*_sy) / (_n*_sx2 - _sx*_sx); _ic = (_sy - _sl*_sx) / _n
     _fig2 = go.Figure()
-    _fig2.add_trace(go.Scatter(
-        x=_years_hdd, y=_hdds,
-        name="HDD (actual)",
-        mode="markers",
-        marker=dict(size=8, color="#FF9800"),
-    ))
-    _fig2.add_trace(go.Scatter(
-        x=_years_hdd, y=_trend_y,
-        name=f"Trend ({_decline_per_decade:.0f} HDD/decade)",
-        mode="lines",
-        line=dict(color="#F44336", width=2, dash="dash"),
-    ))
-    _fig2.update_layout(
-        title="Heating Degree Days \u2014 Switzerland (base 20/12\u00b0C, Zurich Plateau)",
-        xaxis_title="Year",
-        yaxis_title="HDD",
-        template="plotly_white",
-        font=dict(size=14),
-    )
-    _export_fig(_fig2, "fig2_hdd_trend")
+    _fig2.add_trace(go.Scatter(x=_yrs, y=_hdds, name="HDD (actual)", mode="markers", marker=dict(size=8, color="#FF9800")))
+    _fig2.add_trace(go.Scatter(x=_yrs, y=[_sl*yr+_ic for yr in _yrs], name=f"Trend ({_sl*10:.0f} HDD/decade)", mode="lines", line=dict(color="#F44336", width=2, dash="dash")))
+    apply_theme(_fig2).update_layout(title="Heating Degree Days — Switzerland (base 20/12°C)", xaxis_title="Year", yaxis_title="HDD")
+    export_fig(_fig2, "fig2_hdd_trend", FIGURES_DIR)
 
-    # ------------------------------------------------------------------
-    # 3. Population line chart
-    # ------------------------------------------------------------------
+    # ── fig3: Population (with projections) ──
     _fig3 = go.Figure()
-    _fig3.add_trace(go.Scatter(
-        x=df_pop_full["year"].to_list(),
-        y=[_p / 1_000_000 for _p in df_pop_full["population"].to_list()],
-        name="Population",
-        mode="lines+markers",
-        line=dict(color="#9C27B0", width=3),
-        marker=dict(size=5),
-    ))
-    _fig3.update_layout(
-        title="Swiss Population (millions)",
-        xaxis_title="Year",
-        yaxis_title="Population (millions)",
-        template="plotly_white",
-        font=dict(size=14),
-    )
-    _export_fig(_fig3, "fig3_population")
+    _fig3.add_trace(go.Scatter(x=df_pop_full["year"].to_list(), y=[p/1e6 for p in df_pop_full["population"].to_list()], name="Historical", mode="lines+markers", line=dict(color="#9C27B0", width=3), marker=dict(size=3)))
+    if df_pop_proj is not None:
+        _pyr = df_pop_proj["year"].to_list()
+        _lhy = df_pop_full["year"].max()
+        _lhp = df_pop_full.filter(df_pop_full["year"]==_lhy)["population"][0]/1e6
+        _fig3.add_trace(go.Scatter(x=[_lhy]+_pyr+_pyr[::-1]+[_lhy], y=[_lhp]+[p/1e6 for p in df_pop_proj["pop_high"].to_list()]+[p/1e6 for p in df_pop_proj["pop_low"].to_list()][::-1]+[_lhp], fill="toself", fillcolor="rgba(156,39,176,0.12)", line=dict(width=0), name="BFS high/low"))
+        _fig3.add_trace(go.Scatter(x=[_lhy]+_pyr, y=[_lhp]+[p/1e6 for p in df_pop_proj["pop_reference"].to_list()], name="BFS Reference", mode="lines", line=dict(color="#9C27B0", width=2.5, dash="dash")))
+    for _yr,_y,_txt in [(1964,5.6,"Guest workers"),(1974,6.3,"Oil crisis"),(2002,7.3,"EU free mvmt")]:
+        _fig3.add_annotation(x=_yr, y=_y, text=_txt, showarrow=True, arrowhead=2, arrowsize=0.8, ax=40, ay=-30, font=dict(size=9, color="#666"))
+    apply_theme(_fig3).update_layout(title="Swiss Population — History & BFS Projections (millions)", xaxis_title="Year", yaxis_title="Population (millions)")
+    export_fig(_fig3, "fig3_population", FIGURES_DIR)
 
-    # ------------------------------------------------------------------
-    # 4. Heating mix stacked area
-    # ------------------------------------------------------------------
-    _mix_carriers = ["oil", "gas", "heat_pump", "wood", "electric_resistance", "district_heating", "other_solar"]
-    _mix_colors = {
-        "oil": "#8B4513",
-        "gas": "#FF6B35",
-        "heat_pump": "#2196F3",
-        "wood": "#4CAF50",
-        "electric_resistance": "#FFC107",
-        "district_heating": "#9C27B0",
-        "other_solar": "#00BCD4",
-    }
-    _mix_labels = {
-        "oil": "Heating Oil",
-        "gas": "Natural Gas",
-        "heat_pump": "Heat Pumps (electric)",
-        "wood": "Wood / Biomass",
-        "electric_resistance": "Electric Resistance",
-        "district_heating": "District Heating",
-        "other_solar": "Other (Coal + misc)",
-    }
-
+    # ── fig4: Heating mix ──
     _fig4 = go.Figure()
-    for _mc in _mix_carriers:
-        _fig4.add_trace(go.Scatter(
-            x=df_mix["year"].to_list(),
-            y=df_mix[_mc].to_list(),
-            name=_mix_labels[_mc],
-            mode="lines",
-            stackgroup="one",
-            line=dict(width=0.5, color=_mix_colors[_mc]),
-            fillcolor=_mix_colors[_mc],
-        ))
-    _fig4.update_layout(
-        title="Swiss Residential Heating \u2014 Floor Area Share by System (%, BFE/Prognos 2025)",
-        xaxis_title="Year",
-        yaxis_title="Share of Floor Area (%)",
-        yaxis=dict(range=[0, 100]),
-        template="plotly_white",
-        font=dict(size=14),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
-    )
-    _export_fig(_fig4, "fig4_heating_mix")
+    for _mc in MIX_CARRIERS:
+        _fig4.add_trace(go.Scatter(x=df_mix["year"].to_list(), y=df_mix[_mc].to_list(), name=MIX_LABELS[_mc], mode="lines", stackgroup="one", line=dict(width=0.5, color=MIX_COLORS[_mc]), fillcolor=MIX_COLORS[_mc]))
+    apply_theme(_fig4).update_layout(title="Swiss Residential Heating — Floor Area Share by System (%)", xaxis_title="Year", yaxis_title="Share of Floor Area (%)", yaxis=dict(range=[0,100]))
+    export_fig(_fig4, "fig4_heating_mix", FIGURES_DIR)
 
-    # ------------------------------------------------------------------
-    # 5. Decoupling indexed chart
-    # ------------------------------------------------------------------
+    # ── fig5: Decoupling ──
     _fig5 = go.Figure()
-
-    _decouple_series = [
-        ("gdp_idx", "GDP (real)", "#E91E63", "solid", 3),
-        ("pop_idx", "Population", "#9C27B0", "dash", 2),
-        ("floor_idx", "Heated Floor Area", "#FF9800", "dashdot", 2),
-        ("energy_idx", "Space-Heating Energy", "#2196F3", "solid", 3),
-        ("intensity_idx", "Energy Intensity (kWh/m\u00b2)", "#F44336", "dot", 2),
-    ]
-
-    for _col, _name, _color, _dash, _width in _decouple_series:
-        _fig5.add_trace(go.Scatter(
-            x=df_indexed["year"].to_list(),
-            y=df_indexed[_col].to_list(),
-            name=_name,
-            mode="lines+markers",
-            line=dict(color=_color, width=_width, dash=_dash),
-            marker=dict(size=4),
-        ))
-
+    for _col, _name, _color, _dash, _width in DECOUPLE_SERIES:
+        _fig5.add_trace(go.Scatter(x=df_indexed["year"].to_list(), y=df_indexed[_col].to_list(), name=_name, mode="lines+markers", line=dict(color=_color, width=_width, dash=_dash), marker=dict(size=4)))
     _fig5.add_hline(y=100, line_dash="dot", line_color="gray", opacity=0.5)
+    for _yr, _text, _ypos in [(2007,"SIA 380/1",1.02),(2008,"CO\u2082 levy",1.10),(2010,"Buildings Prog.",1.02),(2015,"MuKEn 2014",1.02),(2022,"CHF 120/t CO\u2082",1.02)]:
+        _fig5.add_vline(x=_yr, line_dash="dot", line_color="rgba(0,0,0,0.12)")
+        _fig5.add_annotation(x=_yr, y=_ypos, yref="paper", text=_text, showarrow=False, font=dict(size=8, color="#555"), textangle=-35, xanchor="left", yanchor="bottom")
+    apply_theme(_fig5).update_layout(title="Decoupling: Space-Heating Energy vs Economic Growth (2000 = 100)", xaxis_title="Year", yaxis_title="Index (2000 = 100)", margin=dict(t=110))
+    export_fig(_fig5, "fig5_decoupling", FIGURES_DIR)
 
-    for _yr, _text, _ypos in [
-        (2008, "CO2 levy", 108),
-        (2010, "Gebaudeprogramm", 118),
-        (2015, "MuKEn 2014", 128),
-        (2022, "CHF 120/t CO2", 138),
-    ]:
-        _fig5.add_vline(x=_yr, line_dash="dot", line_color="rgba(0,0,0,0.15)")
-        _fig5.add_annotation(
-            x=_yr, y=_ypos, text=_text, showarrow=False,
-            font=dict(size=9, color="gray"),
-        )
-
-    _fig5.update_layout(
-        title="Decoupling: Space-Heating Energy vs Economic Growth (2000 = 100)",
-        xaxis_title="Year",
-        yaxis_title="Index (2000 = 100)",
-        template="plotly_white",
-        font=dict(size=14),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.22, xanchor="center", x=0.5),
-    )
-    _export_fig(_fig5, "fig5_decoupling")
-
-    # ------------------------------------------------------------------
-    # 6. Floor area per person
-    # ------------------------------------------------------------------
+    # ── fig6: Floor area ──
     _fig6 = go.Figure()
-    _fig6.add_trace(go.Scatter(
-        x=df_floor_area["year"].to_list(),
-        y=df_floor_area["m2_per_person_sfh"].to_list(),
-        name="Single-Family Houses",
-        mode="lines+markers",
-        line=dict(color="#FF9800", width=2.5),
-        marker=dict(size=6),
-    ))
-    _fig6.add_trace(go.Scatter(
-        x=df_floor_area["year"].to_list(),
-        y=df_floor_area["m2_per_person_mfh"].to_list(),
-        name="Multi-Family Buildings",
-        mode="lines+markers",
-        line=dict(color="#2196F3", width=2.5),
-        marker=dict(size=6),
-    ))
-    _fig6.add_trace(go.Scatter(
-        x=df_floor_area["year"].to_list(),
-        y=df_floor_area["m2_per_person_avg"].to_list(),
-        name="Weighted Average (~30/70)",
-        mode="lines+markers",
-        line=dict(color="#4CAF50", width=3, dash="dash"),
-        marker=dict(size=5),
-    ))
-    _fig6.update_layout(
-        title="Average Floor Area per Person \u2014 Swiss Residential Buildings (BFS GWS)",
-        xaxis_title="Year",
-        yaxis_title="m\u00b2 per person",
-        template="plotly_white",
-        font=dict(size=14),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.22, xanchor="center", x=0.5),
-    )
-    _export_fig(_fig6, "fig6_floor_area")
+    _fig6.add_trace(go.Scatter(x=df_floor_area["year"].to_list(), y=df_floor_area["m2_per_person_sfh"].to_list(), name="Single-Family", mode="lines+markers", line=dict(color="#FF9800", width=2.5), marker=dict(size=6)))
+    _fig6.add_trace(go.Scatter(x=df_floor_area["year"].to_list(), y=df_floor_area["m2_per_person_mfh"].to_list(), name="Multi-Family", mode="lines+markers", line=dict(color="#2196F3", width=2.5), marker=dict(size=6)))
+    _fig6.add_trace(go.Scatter(x=df_floor_area["year"].to_list(), y=df_floor_area["m2_per_person_avg"].to_list(), name="Weighted Avg (~30/70)", mode="lines+markers", line=dict(color="#4CAF50", width=3, dash="dash"), marker=dict(size=5)))
+    apply_theme(_fig6).update_layout(title="Average Floor Area per Person — Swiss Residential (BFS GWS)", xaxis_title="Year", yaxis_title="m² per person")
+    export_fig(_fig6, "fig6_floor_area", FIGURES_DIR)
 
-    # ------------------------------------------------------------------
-    # 7. Buildings by heating source 2000 vs 2021
-    # ------------------------------------------------------------------
-    _sources_exp = df_heating_compare["source"].to_list()
-    _v2000_exp = df_heating_compare["buildings_2000"].to_list()
-    _v2021_exp = df_heating_compare["buildings_2021"].to_list()
-
-    _bar_colors_exp = {
-        "Heat Pump": "#2196F3",
-        "Gas": "#FF6B35",
-        "Heating Oil": "#8B4513",
-        "Wood": "#4CAF50",
-        "Electricity": "#FFC107",
-        "Solar Thermal": "#00BCD4",
-        "District Heating": "#9C27B0",
-        "Other": "#607D8B",
-    }
-
+    # ── fig7: Buildings by heating source ──
+    _src = df_heating_compare["source"].to_list()
     _fig7 = go.Figure()
-    _fig7.add_trace(go.Bar(
-        x=_sources_exp,
-        y=[_v / 1000 for _v in _v2000_exp],
-        name="2000",
-        marker_color=[_bar_colors_exp.get(_s, "#999") for _s in _sources_exp],
-        opacity=0.5,
-    ))
-    _fig7.add_trace(go.Bar(
-        x=_sources_exp,
-        y=[_v / 1000 for _v in _v2021_exp],
-        name="2021",
-        marker_color=[_bar_colors_exp.get(_s, "#999") for _s in _sources_exp],
-        opacity=0.9,
-    ))
-    _fig7.update_layout(
-        title="Residential Buildings by Heating Energy Source \u2014 2000 vs 2021 (BFS GWS)",
-        xaxis_title="Energy Source",
-        yaxis_title="Number of Buildings (thousands)",
-        barmode="group",
-        template="plotly_white",
-        font=dict(size=14),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.18, xanchor="center", x=0.5),
-    )
-    _export_fig(_fig7, "fig7_buildings_heating")
+    _fig7.add_trace(go.Bar(x=_src, y=[v/1000 for v in df_heating_compare["buildings_2000"].to_list()], name="2000", marker_color="#BDBDBD", marker_line=dict(color="#757575", width=1.5)))
+    _fig7.add_trace(go.Bar(x=_src, y=[v/1000 for v in df_heating_compare["buildings_2021"].to_list()], name="2021", marker_color=[BUILDING_HEAT_COLORS.get(s,"#999") for s in _src]))
+    apply_theme(_fig7).update_layout(title="Residential Buildings by Heating Source \u2014 2000 vs 2021", xaxis_title="Energy Source", yaxis_title="Buildings (thousands)", barmode="group")
+    export_fig(_fig7, "fig7_buildings_heating", FIGURES_DIR)
 
-    # ------------------------------------------------------------------
-    # 8. LMDI waterfall chart
-    # ------------------------------------------------------------------
-    _last_lmdi = df_lmdi[-1]
-    _pop_val = _last_lmdi["cum_pop"].item()
-    _weather_val = _last_lmdi["cum_weather"].item()
-    _intensity_val = _last_lmdi["cum_intensity"].item()
-    _net_val = _last_lmdi["cum_total"].item()
+    # ── fig8: LMDI horizontal diverging bar ──
+    _last = df_lmdi[-1]
+    _n8 = "4" if USE_LMDI_4FACTOR else "3"
+    _factors8: list[tuple[str, float, str]] = []
+    if USE_LMDI_4FACTOR:
+        _factors8 = [
+            ("Intensity (tech.)", _last["cum_intensity"].item(), LMDI_COLORS["intensity"]),
+            ("Weather (HDD)", _last["cum_weather"].item(), LMDI_COLORS["weather"]),
+            ("Floor Area/cap", _last["cum_floor"].item(), LMDI_COLORS["floor_area"]),
+            ("Population", _last["cum_pop"].item(), LMDI_COLORS["population"]),
+        ]
+    else:
+        _factors8 = [
+            ("Intensity (tech.)", _last["cum_intensity"].item(), LMDI_COLORS["intensity"]),
+            ("Weather (HDD)", _last["cum_weather"].item(), LMDI_COLORS["weather"]),
+            ("Population", _last["cum_pop"].item(), LMDI_COLORS["population"]),
+        ]
+    _net8 = _last["cum_total"].item()
+    _fig8 = go.Figure()
+    for _label, _val, _color in _factors8:
+        _fig8.add_trace(go.Bar(y=[_label], x=[_val], orientation="h", marker_color=_color, showlegend=False, text=f"{_val:+,.0f} TJ", textposition="inside", insidetextanchor="end", textfont=dict(size=12, color="white"), constraintext="none"))
+    _fig8.add_trace(go.Scatter(x=[_net8], y=["Net Change"], mode="markers+text", marker=dict(symbol="diamond", size=14, color=LMDI_COLORS["net"]), text=[f"{_net8:+,.0f} TJ"], textposition="middle right", textfont=dict(size=12), showlegend=False))
+    _fig8.add_vline(x=0, line_width=1.5, line_color="black")
+    apply_theme(_fig8).update_layout(title=f"LMDI-I {_n8}-Factor Decomposition — Cumulative Change (2000–{df_lmdi['year'][-1]}, TJ)", xaxis_title="Cumulative ΔE (TJ)", yaxis_title="", yaxis=dict(categoryorder="array", categoryarray=[f[0] for f in _factors8] + ["Net Change"]), height=350 if not USE_LMDI_4FACTOR else 400, margin=dict(l=150))
+    export_fig(_fig8, "fig8_lmdi_waterfall", FIGURES_DIR)
 
-    _fig8 = go.Figure(go.Waterfall(
-        name="LMDI",
-        orientation="v",
-        measure=["relative", "relative", "relative", "total"],
-        x=["Population", "Weather (HDD)", "Intensity (tech.)", "Net Change"],
-        y=[_pop_val, _weather_val, _intensity_val, _net_val],
-        text=[
-            f"{_pop_val:+.0f} TJ",
-            f"{_weather_val:+.0f} TJ",
-            f"{_intensity_val:+.0f} TJ",
-            f"{_net_val:+.0f} TJ",
-        ],
-        textposition="outside",
-        connector=dict(line=dict(color="rgba(0,0,0,0.3)", width=1)),
-        increasing=dict(marker=dict(color="#F44336")),
-        decreasing=dict(marker=dict(color="#4CAF50")),
-        totals=dict(marker=dict(color="#2196F3")),
-    ))
-    _fig8.update_layout(
-        title="LMDI-I Decomposition of Space-Heating Energy Change (2000 to latest, TJ)",
-        yaxis_title="Cumulative \u0394E (TJ)",
-        template="plotly_white",
-        font=dict(size=14),
-        showlegend=False,
-    )
-    _export_fig(_fig8, "fig8_lmdi_waterfall")
-
-    # ------------------------------------------------------------------
-    # 9. LMDI cumulative time series
-    # ------------------------------------------------------------------
-    _years_lmdi = df_lmdi["year"].to_list()
-
+    # ── fig9: LMDI diverging stacked bar ──
+    _years9 = df_lmdi["year"].to_list()
+    _bar9: list[tuple[str, str, str]] = [("dE_pop", "Population", LMDI_COLORS["population"])]
+    if USE_LMDI_4FACTOR:
+        _bar9.append(("dE_floor", "Floor Area/cap", LMDI_COLORS["floor_area"]))
+    _bar9.extend([("dE_weather", "Weather", LMDI_COLORS["weather"]), ("dE_intensity", "Intensity", LMDI_COLORS["intensity"])])
     _fig9 = go.Figure()
-    _fig9.add_trace(go.Scatter(
-        x=_years_lmdi, y=df_lmdi["cum_pop"].to_list(),
-        name="Population",
-        mode="lines+markers",
-        line=dict(color="#F44336", width=2.5),
-        marker=dict(size=4),
-    ))
-    _fig9.add_trace(go.Scatter(
-        x=_years_lmdi, y=df_lmdi["cum_weather"].to_list(),
-        name="Weather (HDD)",
-        mode="lines+markers",
-        line=dict(color="#2196F3", width=2.5),
-        marker=dict(size=4),
-    ))
-    _fig9.add_trace(go.Scatter(
-        x=_years_lmdi, y=df_lmdi["cum_intensity"].to_list(),
-        name="Intensity (tech.)",
-        mode="lines+markers",
-        line=dict(color="#4CAF50", width=2.5),
-        marker=dict(size=4),
-    ))
-    _fig9.add_trace(go.Scatter(
-        x=_years_lmdi, y=df_lmdi["cum_total"].to_list(),
-        name="Net Change",
-        mode="lines+markers",
-        line=dict(color="#212121", width=3, dash="dash"),
-        marker=dict(size=5),
-    ))
-    _fig9.add_hline(y=0, line_dash="dot", line_color="gray", opacity=0.5)
-    _fig9.update_layout(
-        title="Cumulative LMDI-I Decomposition \u2014 Year-by-Year (TJ, base 2000)",
-        xaxis_title="Year",
-        yaxis_title="Cumulative \u0394E (TJ)",
-        template="plotly_white",
-        font=dict(size=14),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.22, xanchor="center", x=0.5),
-    )
-    _export_fig(_fig9, "fig9_lmdi_timeseries")
+    for _col, _name, _color in _bar9:
+        _fig9.add_trace(go.Bar(x=_years9, y=df_lmdi[_col].to_list(), name=_name, marker_color=_color))
+    _fig9.add_trace(go.Scatter(x=_years9, y=df_lmdi["dE_total"].to_list(), name="Net", mode="lines+markers", line=dict(color=LMDI_COLORS["net"], width=2.5, dash="dash"), marker=dict(size=5, color=LMDI_COLORS["net"])))
+    _fig9.add_hline(y=0, line_width=1, line_color="black")
+    apply_theme(_fig9).update_layout(title=f"Annual LMDI-I {_n8}-Factor Decomposition (TJ)", xaxis_title="Year", yaxis_title="Annual \u0394E (TJ)", barmode="relative", width=1150, margin=dict(b=110))
+    _fig9.add_annotation(text="Note: Population and Floor Area effects are small relative to Weather and Intensity.", xref="paper", yref="paper", x=0.5, y=-0.35, showarrow=False, font=dict(size=10, color="#888"), xanchor="center")
+    export_fig(_fig9, "fig9_lmdi_timeseries", FIGURES_DIR)
+
+    print(f"Exported fig1-fig9 to {FIGURES_DIR}")
     return
 
 
 @app.cell
-def _(
-    fig_cost,
-    fig_hdd_norm,
-    fig_intensity_attr,
-    fig_scenario_fan,
-    fig_tornado,
-):
-    from pathlib import Path as _Path2
-
-    _app2 = _Path2(__file__).resolve()
-    _proj2 = _app2.parent.parent if _app2.parent.name == "notebooks" else _app2.parent
-    _FIGS2 = _proj2 / "figures"
-    _FIGS2.mkdir(exist_ok=True)
-
+def _(FIGURES_DIR, export_fig, fig_canton_map, fig_cost, fig_floor_period, fig_hdd_norm, fig_heating_by_type, fig_intensity_attr, fig_scenario_fan, fig_tornado):
     _new_figs = [
         (fig_hdd_norm, "fig10_energy_hdd_normalized"),
         (fig_intensity_attr, "fig11_intensity_attribution"),
         (fig_scenario_fan, "fig12_scenario_fan"),
         (fig_tornado, "fig13_scenario_tornado"),
         (fig_cost, "fig14_cost_comparison"),
+        (fig_heating_by_type, "fig15_heating_by_type"),
+        (fig_floor_period, "fig16_floor_area_by_period"),
+        (fig_canton_map, "fig17_canton_hp_map"),
     ]
-
-    _exported2 = []
     for _fig, _name in _new_figs:
-        for _ext in ("svg", "pdf"):
-            _out = _FIGS2 / f"{_name}.{_ext}"
-            _fig.write_image(str(_out), width=1000, height=550)
-            _exported2.append(str(_out))
+        export_fig(_fig, _name, FIGURES_DIR)
+    print(f"Exported fig10-fig17 to {FIGURES_DIR}")
     return
 
 
@@ -2831,6 +2289,9 @@ def _(mo):
     | 12 | `fig12_scenario_fan.svg` | `fig12_scenario_fan.pdf` |
     | 13 | `fig13_scenario_tornado.svg` | `fig13_scenario_tornado.pdf` |
     | 14 | `fig14_cost_comparison.svg` | `fig14_cost_comparison.pdf` |
+    | 15 | `fig15_heating_by_type.svg` | `fig15_heating_by_type.pdf` |
+    | 16 | `fig16_floor_area_by_period.svg` | `fig16_floor_area_by_period.pdf` |
+    | 17 | `fig17_canton_hp_map.svg` | `fig17_canton_hp_map.pdf` |
 
     All figures saved to `figures/` for inclusion in the Typst report.
     """)
