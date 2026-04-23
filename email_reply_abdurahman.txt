@@ -1,0 +1,32 @@
+Dear Abdurahman,
+
+Thank you for the feedback and for relaying the professor's comments — very helpful.
+
+Good news: we've already addressed the main concern. The intensity sub-decomposition (the split between envelope, fuel switching, and behaviour) is no longer taken from literature. We now compute the fuel-switching share directly from our own data:
+
+- We track the fleet's "effective energy multiplier" year by year using floor-area shares by heating system (Prognos Tabelle 13) combined with system efficiencies (COP for heat pumps, combustion efficiency for boilers).
+- This multiplier dropped ~20% from 2000 to 2024 as oil (1/0.90 = 1.11 final energy per useful heat unit) was replaced by heat pumps (1/3.5 = 0.29).
+- We weight each year's contribution using the LMDI log-mean weights, maintaining consistency with the main decomposition.
+- The envelope + behavioural share is derived as the residual, split 2:1 based on stock-turnover estimates.
+
+The updated results:
+- Fuel switching: ~51% (-34,700 TJ) — up from the old literature-based ~35%
+- Building envelope: ~33% (-22,700 TJ) — down from ~45%
+- Behavioural: ~16% (-11,200 TJ) — down from ~20%
+
+We also cross-validated this against the Gebäudeprogramm Jahresbericht 2024, which independently reports that Haustechnik (heating system replacement) accounts for 62% of programme energy savings vs. 19% for Wärmedämmung (insulation) — consistent with our finding that fuel switching dominates.
+
+The total -67,366 TJ intensity effect was always our own LMDI computation — we've now added an explicit counterfactual calculation in the report to make this clearer (E_counterfactual = P_2024 x (A/P)_2024 x HDD_2024 x I_2000).
+
+Beyond the sub-decomposition, we also addressed the other feedback from the presentation:
+- Added HDD-normalized energy chart to confirm the structural decline isn't driven by recent mild winters
+- Clarified all percentage denominators throughout
+- Contextualized the Basel-Stadt vs Fribourg comparison (urban MFH vs rural EFH)
+- Expanded district heating as the solution for dense urban cantons
+- Corrected the MuKEn discussion (event-triggered fossil ban, not mandatory renovation — with Geneva and Vaud as the cantons going further)
+- Strengthened the Monte Carlo justification
+
+We'll continue developing the scenario analysis as suggested. Happy to meet before next week if useful, otherwise see you then.
+
+Best regards,
+Elie (on behalf of Group 12)

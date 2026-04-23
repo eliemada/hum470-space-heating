@@ -48,6 +48,7 @@ def _(mo):
 
 @app.cell
 def _():
+    import numpy as np
     import polars as pl
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
@@ -131,6 +132,7 @@ def _():
         MIX_CARRIERS,
         MIX_COLORS,
         MIX_LABELS,
+        np,
         RAW_DIR,
         SYSTEM_COLORS,
         annuity_factor,
@@ -1706,7 +1708,7 @@ def _(USE_LMDI_4FACTOR, df_lmdi, mo):
 
 
 @app.cell
-def _(apply_theme, df_hdd, df_hh, get_sh_share, go, mo, pl):
+def _(apply_theme, df_hdd, df_hh, get_sh_share, go, mo, np, pl):
     _hdd_ref = df_hdd.filter(pl.col("year").is_between(2000, 2024))["hdd"].mean()
 
     _df_e_yr = (
@@ -1722,6 +1724,13 @@ def _(apply_theme, df_hdd, df_hh, get_sh_share, go, mo, pl):
         .with_columns((pl.col("E") * _hdd_ref / pl.col("hdd")).round(0).alias("E_norm"))
     )
 
+    # --- Linear trend on HDD-normalized series ---
+    _years = np.array(df_hdd_norm["year"].to_list(), dtype=float)
+    _e_norm = np.array(df_hdd_norm["E_norm"].to_list(), dtype=float)
+    _slope, _intercept = np.polyfit(_years, _e_norm, 1)
+    _trend_vals = (_slope * _years + _intercept).tolist()
+    _trend_pct = (_slope * (_years[-1] - _years[0])) / (_slope * _years[0] + _intercept) * 100
+
     fig_hdd_norm = go.Figure()
     fig_hdd_norm.add_trace(go.Scatter(
         x=df_hdd_norm["year"].to_list(), y=df_hdd_norm["E"].to_list(),
@@ -1732,6 +1741,11 @@ def _(apply_theme, df_hdd, df_hh, get_sh_share, go, mo, pl):
         name=f"HDD-Normalized (ref={_hdd_ref:.0f})", mode="lines+markers",
         line=dict(color="#1565C0", width=3), marker=dict(size=6),
     ))
+    fig_hdd_norm.add_trace(go.Scatter(
+        x=df_hdd_norm["year"].to_list(), y=_trend_vals,
+        name=f"Structural trend ({_trend_pct:+.0f}%)",
+        mode="lines", line=dict(color="#616161", width=2, dash="dash"),
+    ))
     apply_theme(fig_hdd_norm).update_layout(
         title="Space-Heating Energy — Actual vs HDD-Normalized (TJ)",
         xaxis_title="Year", yaxis_title="Final Energy (TJ)",
@@ -1741,7 +1755,7 @@ def _(apply_theme, df_hdd, df_hh, get_sh_share, go, mo, pl):
     _e_first = df_hdd_norm.filter(pl.col("year") == df_hdd_norm["year"].min())["E_norm"][0]
     _e_last = df_hdd_norm.filter(pl.col("year") == df_hdd_norm["year"].max())["E_norm"][0]
     _pct = (_e_last - _e_first) / _e_first * 100
-    mo.md(f"**HDD-normalized structural change: {_pct:+.1f}%** from {df_hdd_norm['year'].min()} to {df_hdd_norm['year'].max()}.")
+    mo.md(f"**HDD-normalized structural change: {_pct:+.1f}%** (linear trend: {_trend_pct:+.1f}%) from {df_hdd_norm['year'].min()} to {df_hdd_norm['year'].max()}.")
     return df_hdd_norm, fig_hdd_norm
 
 
@@ -1751,19 +1765,94 @@ def _(apply_theme, df_hdd, df_hh, get_sh_share, go, mo, pl):
 
 
 @app.cell
-def _(apply_theme, df_lmdi, go):
+def _(apply_theme, df_lmdi, df_lmdi_input, df_mix, go, mo, np, pl):
+    # ── System efficiencies (COP for HPs, thermal η for combustion) ───
+    # Sources: economics.py defaults, FWS 2024, EnergieSchweiz
+    _EFF = {
+        "oil":                 0.90,   # condensing oil boiler
+        "gas":                 0.95,   # condensing gas boiler
+        "heat_pump":           3.5,    # weighted avg air-source (3.2) + ground-source (4.0)
+        "wood":                0.75,   # log/pellet boiler average
+        "electric_resistance": 1.0,    # direct electric
+        "district_heating":    1.0,    # final-energy basis (losses upstream)
+        "other_solar":         0.85,   # coal + other (conservative)
+    }
+
+    # ── Compute effective energy multiplier per year ──────────────────
+    # eff_factor = Σ(s_i / η_i)  where s_i = floor-area share (fraction)
+    # This captures how much final energy the fleet needs per unit of
+    # useful heat.  As oil (1/0.9=1.11) is replaced by HP (1/3.5=0.29),
+    # eff_factor drops → fuel-switching effect.
+    _systems = list(_EFF.keys())
+    _mix_years = df_mix["year"].to_list()
+
+    _eff_factors: list[float] = []
+    for _yr in _mix_years:
+        _row = df_mix.filter(pl.col("year") == _yr)
+        _ef = sum(_row[sys].item() / 100.0 / _EFF[sys] for sys in _systems)
+        _eff_factors.append(_ef)
+
+    # ── Sub-decompose intensity using LMDI weights ────────────────────
+    # I = q × eff_factor  where q = useful-heat quality (envelope+behavior)
+    # ln(I_t/I_{t-1}) = ln(q_t/q_{t-1}) + ln(eff_t/eff_{t-1})
+    # Each term weighted by the LMDI log-mean weight L_t
+    from lib.lmdi import _log_mean
+
+    _E = df_lmdi_input["E"].to_list()
+    _cum_fuel_switch = 0.0
+    _cum_envelope_behav = 0.0
+
+    for t in range(1, len(_mix_years)):
+        _L = _log_mean(_E[t], _E[t - 1])
+        _d_fuel = _L * np.log(_eff_factors[t] / _eff_factors[t - 1])
+        _d_envel = _L * np.log(
+            (_eff_factors[t - 1] / _eff_factors[t])  # remove fuel-switching
+            * 1.0  # placeholder: identity
+        )
+        # Actually: dI = d_fuel + d_envelope_behav
+        # d_envelope_behav = dI_total - d_fuel
+        _dI_total = df_lmdi.filter(pl.col("year") == _mix_years[t])
+        if _dI_total.shape[0] > 0:
+            _dI = _dI_total["dE_intensity"].item()
+            _cum_fuel_switch += _d_fuel
+            _cum_envelope_behav += _dI - _d_fuel
+
     _total_intensity = df_lmdi[-1]["cum_intensity"].item()
-    # Fixed indicative shares from literature (BFE/Prognos 2024, TEP Energy)
-    _envelope_share = 0.45
-    _fuel_switch_share = 0.35
-    _other_share = 1.0 - _envelope_share - _fuel_switch_share
-    _envelope_pct = round(_envelope_share * 100)
+
+    # Compute shares
+    _fuel_switch_share = _cum_fuel_switch / _total_intensity if _total_intensity != 0 else 0
+    _envelope_behav_share = _cum_envelope_behav / _total_intensity if _total_intensity != 0 else 0
+
+    # Split envelope vs behavioral using renovation-rate heuristic:
+    # ~26% of stock renovated (1.1%/yr × 24yr), ~15% new construction
+    # → ~40% of stock has improved envelope → roughly 2/3 of non-fuel effect
+    _ENVELOPE_FRAC_OF_RESIDUAL = 0.67
+    _envelope_share = _envelope_behav_share * _ENVELOPE_FRAC_OF_RESIDUAL
+    _behav_share = _envelope_behav_share * (1.0 - _ENVELOPE_FRAC_OF_RESIDUAL)
+
     _fuel_switch_pct = round(_fuel_switch_share * 100)
-    _other_pct = round(_other_share * 100)
+    _envelope_pct = round(_envelope_share * 100)
+    _behav_pct = 100 - _fuel_switch_pct - _envelope_pct  # ensure sum = 100
+
+    mo.md(f"""
+    **Intensity sub-decomposition (computed from data)**
+
+    | Mechanism | Share | TJ |
+    |-----------|-------|----|
+    | Building envelope | ~{_envelope_pct}% | {_total_intensity * _envelope_share:,.0f} |
+    | Fuel switching | ~{_fuel_switch_pct}% | {_cum_fuel_switch:,.0f} |
+    | Behavioral + other | ~{_behav_pct}% | {_total_intensity * _behav_share:,.0f} |
+    | **Total intensity** | **100%** | **{_total_intensity:,.0f}** |
+
+    *Fuel-switching share computed from floor-area mix (Prognos Tab.13) × system
+    efficiencies. Envelope/behavioral split: 2/3 of residual attributed to envelope
+    based on stock-turnover rate (~40% of stock improved since 2000).*
+    """)
+
     _shares = {
-        f"Building Envelope ({_envelope_pct}%)": _envelope_share,
-        f"Fuel Switching ({_fuel_switch_pct}%)": _fuel_switch_share,
-        f"Other ({_other_pct}%)": _other_share,
+        f"Building Envelope (~{_envelope_pct}%)": _envelope_share,
+        f"Fuel Switching (~{_fuel_switch_pct}%)": _fuel_switch_share,
+        f"Behavioral + Other (~{_behav_pct}%)": _behav_share,
     }
 
     fig_intensity_attr = go.Figure(go.Bar(
@@ -1771,15 +1860,15 @@ def _(apply_theme, df_lmdi, go):
         x=[_total_intensity] + [_total_intensity * s for s in _shares.values()],
         orientation="h",
         marker_color=["#1565C0", "#4CAF50", "#FF9800", "#9E9E9E"],
-        text=[f"{_total_intensity * s:,.0f} TJ" if i > 0 else f"{_total_intensity:,.0f} TJ"
-              for i, s in enumerate([1.0] + list(_shares.values()))],
+        text=[f"{v:,.0f} TJ" for v in
+              [_total_intensity] + [_total_intensity * s for s in _shares.values()]],
         textposition="auto",
     ))
     apply_theme(fig_intensity_attr).update_layout(
-        title="Intensity Effect \u2014 Attribution (indicative)",
+        title="Intensity Effect — Sub-Decomposition (computed)",
         xaxis_title="\u0394E (TJ, cumulative 2000\u2013latest)",
         yaxis=dict(autorange="reversed"), height=400,
-        margin=dict(l=180),
+        margin=dict(l=220),
     )
     fig_intensity_attr
     return (fig_intensity_attr,)
@@ -1881,24 +1970,28 @@ def _(
     _mc = run_monte_carlo(_base, pop_projections=df_pop_proj)
     _named = compute_named_trajectories(_base, pop_projections=df_pop_proj)
 
+    # Prepend base year so the fan connects to the last historical data point
+    _fan_years = [_base.last_year] + _mc["years"]
+    _base_E = _base.E
+
     # Fan chart
     fig_scenario_fan = go.Figure()
     fig_scenario_fan.add_trace(go.Scatter(
-        x=_mc["years"] + _mc["years"][::-1],
-        y=_mc["p90"].tolist() + _mc["p10"][::-1].tolist(),
+        x=_fan_years + _fan_years[::-1],
+        y=[_base_E] + _mc["p90"].tolist() + ([_base_E] + _mc["p10"].tolist())[::-1],
         fill="toself", fillcolor="rgba(158,158,158,0.15)",
         line=dict(width=0), name="10th–90th pctile",
     ))
     fig_scenario_fan.add_trace(go.Scatter(
-        x=_mc["years"] + _mc["years"][::-1],
-        y=_mc["p75"].tolist() + _mc["p25"][::-1].tolist(),
+        x=_fan_years + _fan_years[::-1],
+        y=[_base_E] + _mc["p75"].tolist() + ([_base_E] + _mc["p25"].tolist())[::-1],
         fill="toself", fillcolor="rgba(158,158,158,0.30)",
         line=dict(width=0), name="25th–75th pctile",
     ))
     for _sname, _traj in _named.items():
         _sdef = DEFAULT_SCENARIOS[_sname]
         fig_scenario_fan.add_trace(go.Scatter(
-            x=_mc["years"], y=_traj,
+            x=_fan_years, y=[_base_E] + _traj,
             name=_sdef.label, mode="lines",
             line=dict(color=_sdef.color, width=3),
         ))
