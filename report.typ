@@ -57,34 +57,101 @@
 
 = Introduction <intro>
 
-// Context: why space heating energy matters for growth & sustainability
-// Time-series of this impact compared to total energy or GDP
+== Global Context: Buildings and Climate Change
 
-Space heating is the single largest end use of energy in Swiss households,
-accounting for 65% of total residential energy consumption in
-2024 @prognos2024. Despite decades of efficiency improvements in building
-envelopes and heating systems, the residential sector remains a major
-contributor to Switzerland's final energy demand and associated CO#sub[2]
-emissions @ipcc2023.
+Buildings consume 30% of global final energy and produce 27% of
+energy-related CO#sub[2] emissions @lucon2014. In cold and temperate
+climates, space heating alone accounts for over half of building energy
+demand @iea2024buildings. National net-zero pledges, the Paris
+Agreement's 1.5°C pathway, and the EU's Fit-for-55 package all
+require steep reductions in heating energy.
 
-Understanding how heating energy demand has evolved, and which factors have
-driven that evolution, is essential for designing policies that reconcile
-continued economic development with Switzerland's 2050 net-zero commitments
-@jackson2017.
+Buildings also turn over far more slowly than other capital stock.
+Vehicles last 12--15 years; industrial equipment, 15--20. Residential
+buildings persist for 50--100+ years @meadows2004. A building
+constructed today will still stand in 2080; one built in 1970 will
+likely survive to 2050. Investment decisions made decades ago continue
+to shape today's energy consumption, and today's decisions will lock
+in demand well beyond 2050 @lucon2014 @ipcc2023. The window for
+transforming the stock is narrowing.
 
-Switzerland presents a compelling case study for three reasons. First, its rapid population growth (+25% since 2000), driven by EU/EFTA free-movement immigration, creates unusually strong upward pressure on housing demand --- a dynamic largely absent in demographically stable European countries. Second, its federal structure delegates building regulation to 26 cantons, creating a natural experiment in policy effectiveness. Third, its high GDP per capita (>CHF 80,000) allows testing whether affluence enables or hinders the energy transition --- the core tension of the Environmental Kuznets Curve hypothesis @grossman1995.
+== The Swiss Case: Scale and Significance
 
-Despite extensive monitoring by BFE @bfe2024 and Prognos @prognos2024, no published study applies a formal LMDI decomposition to Swiss residential space-heating energy demand. This report fills that gap by decomposing 2000--2024 demand into four factors (population, floor area per capita, climate, and energy intensity), quantifying their relative contributions, and identifying the policy levers most likely to sustain the observed decoupling trajectory.
+Space heating is the single largest end use of energy in Swiss
+households, accounting for 65% of total residential energy consumption
+in 2024 @prognos2024. In absolute terms, the Swiss residential
+building stock consumed approximately 137,000 TJ for space heating in
+2024 --- equivalent to 38 TWh of final energy, or roughly 20% of
+Switzerland's total final energy demand @bfe2024. Despite decades of
+efficiency improvements in building envelopes and heating systems, the
+residential sector remains a major contributor to Switzerland's final
+energy demand and associated CO#sub[2] emissions @ipcc2023.
 
-Our central research question is: *Has the improvement in energy intensity been sufficient to achieve absolute decoupling of residential heating energy from economic growth, and can this trajectory be sustained under projected demographic and climate trends?*
+Switzerland's building stock comprises approximately 1.8 million
+residential buildings, of which 57% are single-family homes (EFH) and
+37% multi-family buildings (MFH) @bfs2024. The stock is aging: over
+60% of residential buildings were constructed before 1980, when modern
+insulation standards did not yet apply. These pre-1980 buildings
+account for a disproportionate share of heating energy demand due to
+their poor thermal envelopes (typical U-values of 0.8--1.0
+W/(m#super[2]K) versus 0.15--0.25 W/(m#super[2]K) for post-2000
+construction) @kaempf2018.
+
+Understanding how heating energy demand has evolved, and which factors
+have driven that evolution, is essential for designing policies that
+reconcile continued economic development with Switzerland's 2050
+net-zero commitments @jackson2017.
+
+== Why Switzerland? A Natural Experiment
+
+Switzerland's population grew by 25% since 2000, driven by EU/EFTA
+free-movement immigration. Germany grew 3% over the same period;
+Italy shrank. This immigration-driven expansion generates sustained
+pressure on housing demand that most European countries do not face,
+requiring new construction while increasing occupancy in the existing
+stock.
+
+The federal structure delegates building regulation to 26 cantons,
+each setting its own codes, subsidy levels, and enforcement practices.
+Heat-pump adoption rates range from 7% to 42% across cantons. This
+variation enables quasi-experimental assessment of policy instruments
+that a unitary state could not offer.
+
+Switzerland's GDP per capita exceeds CHF 80,000 in constant terms.
+Does affluence enable or hinder the energy transition? The
+Environmental Kuznets Curve hypothesis @grossman1995 predicts an
+inverted-U relationship. If absolute decoupling is achievable anywhere,
+the conditions are met here: wealth, institutional capacity, and
+ambitious targets all present. If Switzerland still falls short, the
+barriers are structural and relevant to other affluent nations.
+
+== Research Gap and Contribution
+
+Despite extensive monitoring by BFE @bfe2024 and Prognos @prognos2024,
+no published study applies a formal LMDI decomposition to Swiss
+residential space-heating energy demand. Existing studies either
+monitor aggregate trends without formal decomposition, or apply
+decomposition methods to the entire Swiss economy without isolating the
+residential heating sub-sector. This report fills that gap by
+decomposing 2000--2024 demand into four factors (population, floor
+area per capita, climate, and energy intensity), quantifying their
+relative contributions, and identifying the policy levers most likely
+to sustain the observed decoupling trajectory.
+
+Our central research question is: *Has the improvement in energy
+intensity been sufficient to achieve absolute decoupling of residential
+heating energy from economic growth, and can this trajectory be
+sustained under projected demographic and climate trends?*
+
+== Report Structure
 
 This report proceeds as follows. @background reviews the theoretical
-background and existing studies. @framework introduces the key concepts and
-our decomposition framework. @drivers identifies the possible main drivers.
-@data describes data sources and methodology. @results presents the
-quantitative decomposition results. @regulation discusses the regulatory
-framework. @scenarios explores future scenarios and policy recommendations.
-@conclusion concludes.
+background and existing studies. @framework introduces the key concepts
+and our decomposition framework. @drivers identifies the possible main
+drivers. @data describes data sources and methodology. @results
+presents the quantitative decomposition results. @regulation discusses
+the regulatory framework. @scenarios explores future scenarios and
+policy recommendations. @conclusion concludes.
 
 
 // =============================================================================
@@ -390,7 +457,7 @@ analytical pipeline, from data sources through decomposition to outputs.
 
 #figure(
   methodology-flowchart(),
-  caption: [Methodology overview: data sources, decomposition framework, and sub-analyses.],
+  caption: [Methodology overview: data sources, decomposition framework, and sub-analyses. Author's contribution.],
 ) <fig:methodology>
 
 == Data Quality and Limitations
@@ -446,11 +513,11 @@ risen steadily. Natural gas peaked around 2005 and has since plateaued.
 District heating and biomass (wood, pellets) have grown modestly.
 
 #figure(
-  image("figures/fig1_energy_by_carrier.svg", width: 90%),
+  image("figures/fig1_energy_by_carrier.svg", width: 100%),
   caption: [Swiss household final energy consumption by energy carrier,
   1980--2024. Petroleum products have halved; electricity and heat-pump
-  ambient energy are the main growth carriers. Source: BFE
-  @bfe2024.],
+  ambient energy are the main growth carriers. Author's elaboration
+  based on BFE @bfe2024.],
 ) <fig:energy-carrier>
 
 The carrier mix has shifted from a fossil-dominated system (>70% of residential final energy from oil and
@@ -461,10 +528,14 @@ decline discussed in @sec:intensity.
 === Climate: heating degree days
 
 Heating degree days (HDD) have declined at $-156$ HDD per
-decade since the 1980s, reflecting Switzerland's warming climate. This
-secular trend reduces heating demand independently of efficiency
-improvements, though year-to-year fluctuations remain substantial
-(individual winters can differ by more than 500 HDD from the trend line).
+decade since the 1980s. The Alps have warmed by +2°C since
+pre-industrial levels, roughly twice the global average, and the trend
+is expected to continue at a similar pace under moderate climate
+scenarios. Year-to-year fluctuations remain large (individual winters
+can differ by more than 500 HDD from the trend line), but the secular
+direction is unambiguous. In the LMDI decomposition, declining HDD
+reduces heating demand by approximately $-450$ TJ/yr, independent of
+any policy intervention.
 
 === Population dynamics
 
@@ -476,12 +547,12 @@ demographic expansion is the single strongest upward pressure on aggregate
 heating demand.
 
 #figure(
-  image("figures/fig3_population.svg", width: 85%),
+  image("figures/fig3_population.svg", width: 100%),
   caption: [Swiss permanent resident population 1960--2024 (historical)
   and BFS reference-scenario projections to 2050. Key demographic
   waves are annotated: guest-worker era, oil-crisis stagnation,
-  EU free-movement acceleration. Source: BFS @bfs2024,
-  World Bank @worldbank2024.],
+  EU free-movement acceleration. Author's elaboration based on
+  BFS @bfs2024 and World Bank @worldbank2024.],
 ) <fig:population>
 
 === Heating-system mix by floor area
@@ -492,12 +563,12 @@ have risen from near zero to 28.9% of heated floor area. Gas has remained stable
 19--21% of floor area; wood and district heating together account for ~12% of floor area.
 
 #figure(
-  image("figures/fig4_heating_mix.svg", width: 88%),
+  image("figures/fig4_heating_mix.svg", width: 100%),
   caption: [Floor-area share by primary heating system, 2000--2024.
   Oil heating has more than halved; heat pumps now lead by floor area
   served. Note: shares are weighted by heated floor area
-  (Energiebezugsfläche), not building count. Source: BFE/Prognos
-  @prognos2024.],
+  (Energiebezugsfläche), not building count. Author's elaboration
+  based on BFE/Prognos @prognos2024.],
 ) <fig:heating-mix>
 
 === Floor area per capita
@@ -531,11 +602,12 @@ that plague Laspeyres or Paasche decompositions.
 full 2000--2024 period.
 
 #figure(
-  image("figures/fig8_lmdi_waterfall.svg", width: 92%),
+  image("figures/fig8_lmdi_waterfall.svg", width: 100%),
   caption: [LMDI-I four-factor decomposition of Swiss residential
   space-heating energy demand --- cumulative change 2000--2024 (TJ).
   Bars show the contribution of each factor; the diamond marks the net
-  change. The decomposition is exact (zero residual).],
+  change. The decomposition is exact (zero residual). Author's
+  contribution.],
 ) <fig:waterfall>
 
 #figure(
@@ -740,21 +812,21 @@ direct visual comparison of economic growth, demographic expansion,
 building-stock growth, and energy trajectories.
 
 #figure(
-  image("figures/fig5_decoupling.svg", width: 90%),
+  image("figures/fig5_decoupling.svg", width: 100%),
   caption: [Decoupling assessment: five indexed series (2000 = 100).
   GDP grew by 51%, population by 25%, heated floor area by 38%, while
   space-heating energy declined by 17% and energy intensity per
   m#super[2] fell by 40%. Policy milestones annotated: SIA 380/1
   revision (2007), CO#sub[2] levy (2008), Buildings Programme (2010),
-  MuKEn 2014 (2015), CHF 120/t CO#sub[2] (2022). Source: authors'
-  calculations based on @bfe2024, @bfs2024, @worldbank2024.],
+  MuKEn 2014 (2015), CHF 120/t CO#sub[2] (2022). Author's
+  contribution based on @bfe2024, @bfs2024, @worldbank2024.],
 ) <fig:decoupling>
 
 The year-to-year fluctuations visible in @fig:decoupling --- particularly the uptick around 2010 and the dip in 2014 --- are predominantly weather-driven. @fig:energy-hdd-norm removes the dominant source of volatility (weather) by normalising heating energy to a reference climate (HDD = 3,159, the 2000--2024 average). Although the normalised series is substantially smoother, some year-to-year variation remains: this residual reflects non-weather factors such as population changes, energy price shocks, economic cycles, and --- notably in 2020 --- increased home occupancy during COVID-19 lockdowns.#footnote[The 2020 uptick in actual heating energy may also partly reflect increased home occupancy during COVID-19 lockdowns, which raised residential heating demand independently of weather.] A linear trend fitted to the HDD-normalised series (dashed line in @fig:energy-hdd-norm) confirms a monotonic structural decline of 19%, strengthening the decoupling finding: the downward trajectory is not an artefact of mild recent winters but reflects genuine, sustained efficiency gains in the building stock. The gap between the actual and normalised series also illustrates the magnitude of weather-induced noise: in cold years (e.g., 2010), actual demand exceeds the structural trend by up to 8%, while mild winters (e.g., 2014, 2020) produce apparent savings that are partly illusory.
 
 #figure(
-  image("figures/fig10_energy_hdd_normalized.svg", width: 90%),
-  caption: [Space-heating energy: actual vs.\ HDD-normalised (reference HDD = 3,159), with a linear structural trend (dashed). Normalising for weather removes the dominant source of year-to-year volatility; the fitted trend line confirms a steady structural decline in heating demand. Source: authors' calculations based on BFE energy balance @bfe2024 and HDD data @meteoswiss2024.],
+  image("figures/fig10_energy_hdd_normalized.svg", width: 100%),
+  caption: [Space-heating energy: actual vs.\ HDD-normalised (reference HDD = 3,159), with a linear structural trend (dashed). Normalising for weather removes the dominant source of year-to-year volatility; the fitted trend line confirms a steady structural decline in heating demand. Author's contribution based on BFE energy balance @bfe2024 and HDD data @meteoswiss2024.],
 ) <fig:energy-hdd-norm>
 
 HDD normalisation removes the dominant source of volatility --- weather --- but residual year-to-year variation ($plus.minus 5 "," 000$ TJ around the trend line) remains because several other drivers are not held constant. First, immigration to Switzerland arrives in waves, particularly following the phased activation of EU/EFTA bilateral free-movement agreements, causing discrete jumps in the number of heated dwellings that shift the normalised series upward in specific years. Second, energy price effects produce temporary dips and recoveries: when oil and gas prices spike (notably in 2008 and during 2011--2014), households respond by reducing thermostat settings or heating fewer rooms, depressing demand below the structural trend; conversely, the 2015--2016 oil price collapse enabled more liberal heating behaviour, producing a visible uptick. Third, COVID-19 lockdowns in 2020 increased daytime residential occupancy through widespread work-from-home arrangements, raising heating demand independently of weather. Fourth, construction cycles introduce lumpiness: new building completions arrive in bursts due to planning and permitting lags, adding heated floor area in discrete steps rather than smoothly. Despite these residual bumps, the structural downward trend remains clear and consistent across the full 2000--2024 period, confirming that the observed decoupling is not an artefact of recent mild winters but reflects genuine, sustained improvements in the building stock.
@@ -788,11 +860,12 @@ building categories (EFH, MFH, mixed-use, and partial residential),
 together with the heat-pump adoption trend from 2021 to 2024.
 
 #figure(
-  image("figures/fig15_heating_by_type.svg", width: 92%),
+  image("figures/fig15_heating_by_type.svg", width: 100%),
   caption: [Heating source distribution by building category and
   heat-pump adoption trend, 2021--2024. Single-family homes (EFH) lead
-  with 28% of buildings using HP as primary heating; mixed-use and partial-residential buildings
-  lag. Source: BFS GWR @bfs2024.],
+  with 28% of buildings using HP as primary heating; mixed-use and
+  partial-residential buildings lag. Author's elaboration based on
+  BFS GWR @bfs2024.],
 ) <fig:heating-type>
 
 The transition is proceeding at distinctly different speeds:
@@ -833,11 +906,11 @@ requires heating for 12 m#super[2] more floor area than their
 MFH counterpart, directly scaling energy demand.
 
 #figure(
-  image("figures/fig16_floor_area_by_period.svg", width: 85%),
+  image("figures/fig16_floor_area_by_period.svg", width: 100%),
   caption: [Floor area per person by building type. The 28% gap between
   EFH (55 m#super[2]) and MFH (43 m#super[2]) means the per-capita
   floor-area factor in the LMDI is not uniform across the stock.
-  Source: BFS @bfs2024.],
+  Author's elaboration based on BFS @bfs2024.],
 ) <fig:floor-period>
 
 Critically, non-EFH buildings (MFH, mixed-use, partial) house
@@ -851,11 +924,12 @@ of intensity decline.
 choropleth map, revealing a striking geographic divide.
 
 #figure(
-  image("figures/fig17_canton_hp_map.svg", width: 80%),
+  image("figures/fig17_canton_hp_map.svg", width: 95%),
   caption: [Cantonal heat-pump adoption rates (share of buildings with
-  HP as primary heating system), 2024. Fribourg leads at 41.8% of buildings,
-  followed by Luzern (33.2%) and Aargau (28.9%). Basel-Stadt (7.4% of buildings)
-  and Neuchâtel (12.0% of buildings) lag. Source: BFS GWR @bfs2024 @sdmx2024.],
+  HP as primary heating system), 2024. Fribourg leads at 41.8% of
+  buildings, followed by Luzern (33.2%) and Aargau (28.9%).
+  Basel-Stadt (7.4% of buildings) and Neuchâtel (12.0% of buildings)
+  lag. Author's elaboration based on BFS GWR @bfs2024 @sdmx2024.],
 ) <fig:canton-map>
 
 Fribourg leads at 41.8% of buildings, while Basel-Stadt (7.4% of buildings) and Neuchâtel (12.0% of buildings)
@@ -873,7 +947,15 @@ while lagging urban cantons represent untapped potential.
 
 === Why intensity dominates
 
-The dominance of the intensity factor reflects three reinforcing mechanisms: (i) tightening building standards that lowered new-build demand from ~100 to \<40 kWh/m#super[2]/yr @muken2014, (ii) heat-pump diffusion with seasonal COP 3--4, reducing final energy by 60--75% per switched unit @fws2024, and (iii) behavioural shifts towards lower indoor temperatures and improved controls.
+Three reinforcing mechanisms drive the intensity factor's dominance over the 2000--2024 period.
+
+Building standards tightened progressively, lowering new-build heating demand from ~100 kWh/m#super[2]/yr (pre-2000) to less than 40 kWh/m#super[2]/yr under MuKEn 2014 @muken2014. Each new building added to the stock dilutes aggregate intensity downward.
+
+Heat-pump diffusion (seasonal COP 3--4) cut final energy by 60--75% for each unit of floor area switched from fossil boilers @fws2024. The cumulative floor area switched from oil to heat pumps now exceeds 100 million m#super[2].
+
+Behavioural shifts towards lower indoor temperatures, together with improved heating controls (thermostatic radiator valves, building automation), contributed an estimated 10--15% of the total intensity reduction.
+
+These mechanisms are partially correlated: deep renovations typically combine envelope upgrades, system replacement, and improved controls in a single intervention. The aggregate intensity factor captures their joint effect, which is why it dominates the decomposition.
 
 === Signs of deceleration
 
@@ -999,7 +1081,7 @@ three levy scenarios.
   caption: [Annual TOTEX comparison for four heating systems under three
   CO#sub[2] levy scenarios. CAPEX annualised over 20 years at 3%, net of
   _Gebäudeprogramm_ subsidies. Reference: 150 m#super[2] unrenovated house,
-  120 kWh/m#super[2]/yr.],
+  120 kWh/m#super[2]/yr. Author's contribution.],
 ) <fig:cost-comparison>
 
 #insight[
@@ -1016,6 +1098,20 @@ price signal for fuel switching.
 
 
 == Scenario Methodology and Sensitivity Analysis <monte-carlo>
+
+=== Why Monte Carlo simulation?
+
+Future renovation rates depend on political will and funding. Population trajectories hinge on immigration agreements. Climate warming follows non-linear dynamics. Three deterministic scenarios (BAU, Accelerated, Ambitious) can only show three discrete outcomes. If a decision-maker looks at BAU vs.\ Ambitious and picks the middle path, they have learned little about which lever matters most or how wide the uncertainty band actually is.
+
+Monte Carlo simulation samples 1,000 parameter combinations from plausible ranges, producing a distribution of outcomes that deterministic scenarios cannot capture. It serves three purposes in this study:
+
++ *Sensitivity ranking.* Varying parameters independently reveals which levers dominate outcome uncertainty. The renovation rate explains 3--6$times$ more variance in 2050 demand than population or climate parameters (@fig:tornado), directing policy attention to the highest-leverage intervention.
+
++ *Uncertainty envelopes.* The fan chart (@fig:scenario-fan) shows the 10th--90th percentile range of plausible futures. Under nearly all parameter combinations, achieving the EP2050+ corridor requires action on multiple fronts. The width of the bands quantifies this claim.
+
++ *Robustness testing.* When the BAU trajectory falls near the 90th percentile (worst outcomes), current policy is inadequate across the full parameter space, not just under pessimistic assumptions.
+
+Our Monte Carlo exercise produces a _sensitivity envelope_, not a probability forecast. The input distributions (uniform for renovation rate and population, normal for HDD decline) bound the range of _plausible_ values, not calibrated probability densities. Future renovation rates are policy choices, not random variables with a known distribution. The exercise ranks sensitivities and communicates uncertainty; it does not predict specific probabilities.
 
 === Projection model
 
@@ -1058,20 +1154,20 @@ The three scenarios are deterministic: BAU (1%/yr renovation rate, current pace)
 To explore parameter uncertainty beyond the three named scenarios, we sample 1,000 parameter combinations: renovation rate uniformly in 0.8--3.2%/yr, population uniformly between BFS low and high projections, and HDD decline normally distributed around 2.5%/decade ($sigma = 1.0$). The resulting trajectories produce a sensitivity envelope (@fig:scenario-fan), _not_ a probability distribution --- the shaded bands represent the range of plausible outcomes given the parameter bounds, without implying that any particular outcome is more likely than another. Future renovation rates and population trajectories are outcomes of policy choices and political decisions, not random variables with a known probability distribution.
 
 #figure(
-  image("figures/fig12_scenario_fan.svg", width: 95%),
+  image("figures/fig12_scenario_fan.svg", width: 100%),
   caption: [Scenario fan chart of projected space-heating energy demand,
   2024--2050. Shaded bands show the 10th--90th and 25th--75th percentile
   sensitivity envelopes from 1,000 parameter combinations. Coloured lines
-  show the three named scenarios.],
+  show the three named scenarios. Author's contribution.],
 ) <fig:scenario-fan>
 
 @fig:scenario-fan shows the fan chart with the three named scenarios overlaid on the sensitivity envelope. The BAU scenario (1% renovation rate) remains near the upper bound, while the Ambitious scenario (3%) tracks the lower bound. The median trajectory projects ~30% reduction by 2050 relative to the 2024 baseline.
 
 #figure(
-  image("figures/fig13_scenario_tornado.svg", width: 90%),
+  image("figures/fig13_scenario_tornado.svg", width: 100%),
   caption: [Tornado sensitivity chart showing the impact of one-at-a-time
   parameter perturbation on 2050 energy demand relative to the median
-  projection.],
+  projection. Author's contribution.],
 ) <fig:tornado>
 
 The tornado chart (@fig:tornado) confirms that the renovation rate is the dominant lever: varying it from 1% to 3%/yr swings 2050 energy demand by $plus.minus$ 12,600 TJ, while population uncertainty contributes $plus.minus$ 4,500 TJ and HDD decline $plus.minus$ 2,000 TJ. The policy-controllable parameter matters 3--6$times$ more than the exogenous drivers --- the key insight for policy design.

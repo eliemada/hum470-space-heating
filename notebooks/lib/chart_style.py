@@ -8,26 +8,26 @@ from pathlib import Path
 import plotly.graph_objects as go
 
 # ── Standard dimensions ────────────────────────────────────────────────
-FIG_WIDTH = 1000
-FIG_HEIGHT = 550
+FIG_WIDTH = 1200
+FIG_HEIGHT = 650
 
 # ── Plotly layout template applied to every figure ─────────────────────
 HUM_TEMPLATE = go.layout.Template(
     layout=go.Layout(
         template="plotly_white",
-        font=dict(family="Inter, Helvetica, Arial, sans-serif", size=14),
-        title=dict(font=dict(size=16)),
-        xaxis=dict(title=dict(font=dict(size=13))),
-        yaxis=dict(title=dict(font=dict(size=13))),
+        font=dict(family="Inter, Helvetica, Arial, sans-serif", size=18),
+        title=dict(font=dict(size=20)),
+        xaxis=dict(title=dict(font=dict(size=16)), tickfont=dict(size=14)),
+        yaxis=dict(title=dict(font=dict(size=16)), tickfont=dict(size=14)),
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=-0.25,
             xanchor="center",
             x=0.5,
-            font=dict(size=12),
+            font=dict(size=14),
         ),
-        margin=dict(l=60, r=30, t=75, b=80),
+        margin=dict(l=70, r=40, t=85, b=90),
         width=FIG_WIDTH,
         height=FIG_HEIGHT,
     ),
