@@ -807,7 +807,7 @@ def _(DECOUPLE_SERIES, apply_theme, df_floor_area, df_hh, df_pop_full, df_wb_gdp
         _fig_decouple.add_vline(x=_yr, line_dash="dot", line_color="rgba(0,0,0,0.12)")
         _fig_decouple.add_annotation(
             x=_yr, y=_ypos, yref="paper", text=_text,
-            showarrow=False, font=dict(size=8, color="#555"),
+            showarrow=False, font=dict(size=12, color="#555"),
             textangle=-35, xanchor="left", yanchor="bottom",
         )
 
@@ -1137,14 +1137,14 @@ def _(BUILDING_HEAT_COLORS, apply_theme, df_gwr_by_type, go, make_subplots, pl):
             line=dict(color=_hp_colors[_cat], width=2.5),
             marker=dict(size=8, color=_hp_colors[_cat]),
             text=[f"{p:.0f}%" if i in (0, len(_years)-1) else "" for i, p in enumerate(_hp_pcts)],
-            textposition="top center", textfont=dict(size=10, color=_hp_colors[_cat]),
+            textposition="top center", textfont=dict(size=14, color=_hp_colors[_cat]),
             showlegend=False,
         ), row=1, col=2)
 
     apply_theme(fig_heating_by_type).update_layout(
-        barmode="stack", height=500, width=1300,
-        margin=dict(l=170, t=85),
-        legend=dict(orientation="h", y=-0.10, x=0.28, xanchor="center", font=dict(size=11)),
+        barmode="stack", height=700, width=1400,
+        margin=dict(l=170, t=90, b=110),
+        legend=dict(orientation="h", y=-0.12, x=0.28, xanchor="center", font=dict(size=15)),
     )
     fig_heating_by_type.update_xaxes(title_text="Share (%)", range=[0, 108], row=1, col=1)
     fig_heating_by_type.update_xaxes(title_text="Year", dtick=1, row=1, col=2)
@@ -1209,13 +1209,13 @@ def _(BUILDING_TYPE_COLORS, RAW_DIR, apply_theme, go, load_floor_area_by_period)
         x=_periods, y=_efh, name="EFH (Single-Family)",
         marker_color=BUILDING_TYPE_COLORS["EFH"],
         text=[f"{v:.0f}" for v in _efh], textposition="outside",
-        textfont=dict(size=10),
+        textfont=dict(size=14),
     ))
     fig_floor_period.add_trace(go.Bar(
         x=_periods, y=_mfh, name="MFH (Multi-Family)",
         marker_color=BUILDING_TYPE_COLORS["MFH"],
         text=[f"{v:.0f}" for v in _mfh], textposition="outside",
-        textfont=dict(size=10),
+        textfont=dict(size=14),
     ))
 
     # National average line
@@ -1338,7 +1338,7 @@ def _(apply_theme, ch_geojson, df_canton_hp, go, px):
                 lon=[_lon], lat=[_lat],
                 text=[_abbr],
                 mode="text",
-                textfont=dict(size=8, color="#333", family="Inter, Helvetica, sans-serif"),
+                textfont=dict(size=12, color="#333", family="Inter, Helvetica, sans-serif"),
                 showlegend=False,
                 hoverinfo="skip",
             ))
@@ -1594,14 +1594,14 @@ def _(LMDI_COLORS, USE_LMDI_4FACTOR, apply_theme, df_lmdi, go):
             marker_color=_color, showlegend=False,
             text=f"{_val:+,.0f} TJ",
             textposition="inside", insidetextanchor="end",
-            textfont=dict(size=12, color="white"),
+            textfont=dict(size=16, color="white"),
             constraintext="none",
         ))
     # Net change as a distinct marker
     fig_lmdi_bar.add_trace(go.Scatter(
         x=[_net_val], y=["Net Change"],
-        mode="markers+text", marker=dict(symbol="diamond", size=14, color=LMDI_COLORS["net"]),
-        text=[f"{_net_val:+,.0f} TJ"], textposition="middle right", textfont=dict(size=12),
+        mode="markers+text", marker=dict(symbol="diamond", size=16, color=LMDI_COLORS["net"]),
+        text=[f"{_net_val:+,.0f} TJ"], textposition="middle right", textfont=dict(size=16),
         showlegend=False,
     ))
     fig_lmdi_bar.add_vline(x=0, line_width=1.5, line_color="black")
@@ -2019,7 +2019,7 @@ def _(
         text=[f"{s[1]:+,.0f} TJ" for s in _sensitivities],
         textposition="inside",
         insidetextanchor="end",
-        textfont=dict(size=12, color="white"),
+        textfont=dict(size=16, color="white"),
         constraintext="none",
     ))
     _tornado_max = max(abs(s[1]) for s in _sensitivities) * 1.15
@@ -2260,7 +2260,7 @@ def _(
         _fig3.add_trace(go.Scatter(x=[_lhy]+_pyr+_pyr[::-1]+[_lhy], y=[_lhp]+[p/1e6 for p in df_pop_proj["pop_high"].to_list()]+[p/1e6 for p in df_pop_proj["pop_low"].to_list()][::-1]+[_lhp], fill="toself", fillcolor="rgba(156,39,176,0.12)", line=dict(width=0), name="BFS high/low"))
         _fig3.add_trace(go.Scatter(x=[_lhy]+_pyr, y=[_lhp]+[p/1e6 for p in df_pop_proj["pop_reference"].to_list()], name="BFS Reference", mode="lines", line=dict(color="#9C27B0", width=2.5, dash="dash")))
     for _yr,_y,_txt in [(1964,5.6,"Guest workers"),(1974,6.3,"Oil crisis"),(2002,7.3,"EU free mvmt")]:
-        _fig3.add_annotation(x=_yr, y=_y, text=_txt, showarrow=True, arrowhead=2, arrowsize=0.8, ax=40, ay=-30, font=dict(size=9, color="#666"))
+        _fig3.add_annotation(x=_yr, y=_y, text=_txt, showarrow=True, arrowhead=2, arrowsize=0.8, ax=40, ay=-30, font=dict(size=13, color="#666"))
     apply_theme(_fig3).update_layout(title="Swiss Population — History & BFS Projections (millions)", xaxis_title="Year", yaxis_title="Population (millions)")
     export_fig(_fig3, "fig3_population", FIGURES_DIR)
 
@@ -2278,7 +2278,7 @@ def _(
     _fig5.add_hline(y=100, line_dash="dot", line_color="gray", opacity=0.5)
     for _yr, _text, _ypos in [(2007,"SIA 380/1",1.02),(2008,"CO\u2082 levy",1.10),(2010,"Buildings Prog.",1.02),(2015,"MuKEn 2014",1.02),(2022,"CHF 120/t CO\u2082",1.02)]:
         _fig5.add_vline(x=_yr, line_dash="dot", line_color="rgba(0,0,0,0.12)")
-        _fig5.add_annotation(x=_yr, y=_ypos, yref="paper", text=_text, showarrow=False, font=dict(size=8, color="#555"), textangle=-35, xanchor="left", yanchor="bottom")
+        _fig5.add_annotation(x=_yr, y=_ypos, yref="paper", text=_text, showarrow=False, font=dict(size=12, color="#555"), textangle=-35, xanchor="left", yanchor="bottom")
     apply_theme(_fig5).update_layout(title="Decoupling: Space-Heating Energy vs Economic Growth (2000 = 100)", xaxis_title="Year", yaxis_title="Index (2000 = 100)", margin=dict(t=110))
     export_fig(_fig5, "fig5_decoupling", FIGURES_DIR)
 
@@ -2318,8 +2318,8 @@ def _(
     _net8 = _last["cum_total"].item()
     _fig8 = go.Figure()
     for _label, _val, _color in _factors8:
-        _fig8.add_trace(go.Bar(y=[_label], x=[_val], orientation="h", marker_color=_color, showlegend=False, text=f"{_val:+,.0f} TJ", textposition="inside", insidetextanchor="end", textfont=dict(size=12, color="white"), constraintext="none"))
-    _fig8.add_trace(go.Scatter(x=[_net8], y=["Net Change"], mode="markers+text", marker=dict(symbol="diamond", size=14, color=LMDI_COLORS["net"]), text=[f"{_net8:+,.0f} TJ"], textposition="middle right", textfont=dict(size=12), showlegend=False))
+        _fig8.add_trace(go.Bar(y=[_label], x=[_val], orientation="h", marker_color=_color, showlegend=False, text=f"{_val:+,.0f} TJ", textposition="inside", insidetextanchor="end", textfont=dict(size=16, color="white"), constraintext="none"))
+    _fig8.add_trace(go.Scatter(x=[_net8], y=["Net Change"], mode="markers+text", marker=dict(symbol="diamond", size=16, color=LMDI_COLORS["net"]), text=[f"{_net8:+,.0f} TJ"], textposition="middle right", textfont=dict(size=16), showlegend=False))
     _fig8.add_vline(x=0, line_width=1.5, line_color="black")
     apply_theme(_fig8).update_layout(title=f"LMDI-I {_n8}-Factor Decomposition — Cumulative Change (2000–{df_lmdi['year'][-1]}, TJ)", xaxis_title="Cumulative ΔE (TJ)", yaxis_title="", yaxis=dict(categoryorder="array", categoryarray=[f[0] for f in _factors8] + ["Net Change"]), height=350 if not USE_LMDI_4FACTOR else 400, margin=dict(l=150))
     export_fig(_fig8, "fig8_lmdi_waterfall", FIGURES_DIR)
