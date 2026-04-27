@@ -599,7 +599,10 @@ that plague Laspeyres or Paasche decompositions.
 === Cumulative results (2000--2024)
 
 @fig:waterfall presents the cumulative LMDI-I decomposition over the
-full 2000--2024 period.
+full 2000--2024 period. The waterfall format separates the upward pressures
+(population, floor area) from the downward drivers (weather, intensity),
+with the net change shown as a diamond marker. @tab:lmdi-summary provides
+the corresponding numerical values and shares.
 
 #figure(
   image("figures/fig8_lmdi_waterfall.svg", width: 100%),
@@ -855,9 +858,15 @@ heterogeneity: building category and cantonal geography.
 
 === Heat-pump adoption by building type
 
-@fig:heating-type shows heating source distribution across four
-building categories (EFH, MFH, mixed-use, and partial residential),
-together with the heat-pump adoption trend from 2021 to 2024.
+The national-average heat-pump share masks large differences across building
+categories. EFH buildings benefit from simpler installation logistics,
+owner-occupancy that aligns investment incentives, and smaller system
+sizes. MFH buildings face split incentives (landlords pay, tenants benefit
+through lower bills), space constraints for outdoor units, and more complex
+permitting. @fig:heating-type shows the resulting heating source
+distribution across four building categories (EFH, MFH, mixed-use, and
+partial residential), together with the heat-pump adoption trend from 2021
+to 2024.
 
 #figure(
   image("figures/fig15_heating_by_type.svg", width: 100%),
@@ -920,8 +929,12 @@ of intensity decline.
 
 === Cantonal variation
 
+Beyond building type, geography introduces a second axis of heterogeneity.
+Cantonal policy differences (MuKEn adoption timing, subsidy generosity)
+interact with building-stock composition (urban vs.\ rural, EFH vs.\ MFH
+share) to produce wide variation in heat-pump penetration.
 @fig:canton-map displays the cantonal heat-pump adoption rate as a
-choropleth map, revealing a striking geographic divide.
+choropleth map.
 
 #figure(
   image("figures/fig17_canton_hp_map.svg", width: 95%),
@@ -994,8 +1007,6 @@ We present the full quantitative summary in @conclusion.
   unlocking heat-pump adoption in multi-family buildings, which house
   73% of the population but account for a minority of installations.
 ]
-
-=== Implications for policy
 
 The policy implications of these findings are developed in @scenarios.
 
@@ -1129,6 +1140,11 @@ This functional form is an engineering approximation, not an empirically calibra
 
 === Three named scenarios
 
+We define three deterministic scenarios that span the range of plausible
+renovation-rate trajectories. All three hold population at the BFS
+reference projection and HDD decline at the central trend; only the
+renovation rate varies. @tab:mc-params summarises the parameters.
+
 #figure(
   table(
     columns: (auto, auto, auto, auto, auto),
@@ -1260,8 +1276,10 @@ dynamics of per-capita space demand.
 
 === Three scenarios for 2050
 
-The three named scenarios (methodology in @monte-carlo) yield the following
-2050 projections:
+The three named scenarios (methodology in @monte-carlo) yield distinct 2050
+outcomes. The spread between BAU and Ambitious is ~22,000 TJ, confirming
+that the renovation rate is the dominant policy lever. @tab:scenarios
+presents the projections alongside key assumptions.
 
 #figure(
   table(
