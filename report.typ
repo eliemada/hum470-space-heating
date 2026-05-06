@@ -159,16 +159,6 @@ intensity been sufficient to achieve absolute decoupling of residential
 heating energy from economic growth, and can this trajectory be
 sustained under projected demographic and climate trends?*
 
-== Report Structure
-
-This report proceeds as follows. @background reviews the theoretical
-background and existing studies. @framework introduces the key concepts
-and our decomposition framework. @drivers identifies the possible main
-drivers. @data describes data sources and methodology. @results
-presents the quantitative decomposition results. @regulation discusses
-the regulatory framework. @scenarios explores future scenarios and
-policy recommendations. @conclusion concludes.
-
 
 // =============================================================================
 // 2. BACKGROUND AND EXISTING STUDIES
@@ -740,14 +730,28 @@ building-stock growth, and energy trajectories.
   contribution based on @bfe2024, @bfs2024, @worldbank2024.],
 ) <fig:decoupling>
 
-The year-to-year fluctuations visible in @fig:decoupling --- particularly the uptick around 2010 and the dip in 2014 --- are predominantly weather-driven. @fig:energy-hdd-norm removes the dominant source of volatility (weather) by normalising heating energy to a reference climate (HDD = 3,159, the 2000--2024 average). Although the normalised series is substantially smoother, some year-to-year variation remains: this residual reflects non-weather factors such as population changes, energy price shocks, economic cycles, and --- notably in 2020 --- increased home occupancy during COVID-19 lockdowns.#footnote[The 2020 uptick in actual heating energy may also partly reflect increased home occupancy during COVID-19 lockdowns, which raised residential heating demand independently of weather.] A linear trend fitted to the HDD-normalised series (dashed line in @fig:energy-hdd-norm) confirms a monotonic structural decline of 19%, strengthening the decoupling finding: the downward trajectory is not an artefact of mild recent winters but reflects genuine, sustained efficiency gains in the building stock. The gap between the actual and normalised series also illustrates the magnitude of weather-induced noise: in cold years (e.g., 2010), actual demand exceeds the structural trend by up to 8%, while mild winters (e.g., 2014, 2020) produce apparent savings that are partly illusory.
+The year-to-year fluctuations in @fig:decoupling --- the uptick around
+2010 and the dip in 2014 --- are predominantly weather-driven.
+@fig:energy-hdd-norm normalises heating energy to a reference climate
+(HDD = 3,159, the 2000--2024 average). The normalised series is much
+smoother, and a linear trend (dashed) confirms a monotonic 19% structural
+decline, strengthening the decoupling finding: the downward trajectory
+is not an artefact of mild recent winters but reflects genuine, sustained
+efficiency gains.
 
 #figure(
   image("figures/fig10_energy_hdd_normalized.svg", width: 100%),
   caption: [Space-heating energy: actual vs.\ HDD-normalised (reference HDD = 3,159), with a linear structural trend (dashed). Normalising for weather removes the dominant source of year-to-year volatility; the fitted trend line confirms a steady structural decline in heating demand. Author's contribution based on BFE energy balance @bfe2024 and HDD data @meteoswiss2024.],
 ) <fig:energy-hdd-norm>
 
-HDD normalisation removes the dominant source of volatility --- weather --- but residual year-to-year variation ($plus.minus 5 "," 000$ TJ around the trend line) remains because several other drivers are not held constant. First, immigration to Switzerland arrives in waves, particularly following the phased activation of EU/EFTA bilateral free-movement agreements, causing discrete jumps in the number of heated dwellings that shift the normalised series upward in specific years. Second, energy price effects produce temporary dips and recoveries: when oil and gas prices spike (notably in 2008 and during 2011--2014), households respond by reducing thermostat settings or heating fewer rooms, depressing demand below the structural trend; conversely, the 2015--2016 oil price collapse enabled more liberal heating behaviour, producing a visible uptick. Third, COVID-19 lockdowns in 2020 increased daytime residential occupancy through widespread work-from-home arrangements, raising heating demand independently of weather. Fourth, construction cycles introduce lumpiness: new building completions arrive in bursts due to planning and permitting lags, adding heated floor area in discrete steps rather than smoothly. Despite these residual bumps, the structural downward trend remains clear and consistent across the full 2000--2024 period, confirming that the observed decoupling is not an artefact of recent mild winters but reflects genuine, sustained improvements in the building stock.
+Residual year-to-year variation ($plus.minus 5 "," 000$ TJ around the
+trend) is driven by non-weather factors not held constant: wave-like
+immigration linked to EU/EFTA free-movement activations, energy-price
+shocks (the 2008 and 2011--2014 oil-price spikes depressed demand,
+the 2015--2016 collapse loosened it), the 2020 COVID-19 work-from-home
+uptick, and lumpy new-build completions. Despite these residual bumps,
+the structural downward trend is clear and consistent over the full
+2000--2024 period.
 
 Between 2000 and 2024:
 - *GDP* (constant 2017 PPP) rose by *+51%*
@@ -815,12 +819,6 @@ The transition is proceeding at distinctly different speeds:
   mixed buildings lagging. Source: BFS GWR @bfs2024.],
 ) <tab:hp-adoption>
 
-EFH buildings benefit from simpler installation logistics, owner-occupancy
-that aligns investment incentives, and smaller system sizes. MFH buildings
-face structural barriers: split incentives (landlords pay, tenants benefit),
-space constraints for outdoor units, cantonal noise regulations, and
-permitting complexity for ground-source drilling or system replacement.
-
 === Floor area by building period
 
 @fig:floor-period shows that EFH provide 55
@@ -860,10 +858,16 @@ choropleth map.
   lag. Author's elaboration based on BFS GWR @bfs2024 @sdmx2024.],
 ) <fig:canton-map>
 
-Fribourg leads at 41.8% of buildings, while Basel-Stadt (7.4% of buildings) and Neuchâtel (12.0% of buildings)
-lag by a wide margin --- a five-fold spread reflecting differences in building
-stock composition, MuKEn adoption timing, and cantonal subsidy generosity.
-However, much of this spread is explained by building stock composition rather than policy alone. Basel-Stadt is essentially a city-canton --- densely built, with predominantly multi-family housing --- where heat pumps face genuine structural constraints: limited outdoor space for air-source units, noise restrictions in close-quarter settings, and difficult permitting for ground-source drilling in built-up areas. Fribourg, by contrast, has a substantially higher share of single-family homes, where heat-pump installation is mechanically simpler and faces fewer regulatory obstacles. The five-fold spread therefore overstates the pure policy gap; a significant portion reflects the urban--rural gradient in building typology. This does not invalidate the finding --- cantonal policy differences remain real and consequential --- but it means that convergence strategies must address building-type constraints (notably through district heating in dense cantons), not only subsidy levels and MuKEn adoption timing.
+Fribourg leads at 41.8% of buildings, while Basel-Stadt (7.4%) and
+Neuchâtel (12.0%) lag --- a five-fold spread that reflects building-stock
+composition, MuKEn adoption timing, and cantonal subsidy generosity. Much
+of this spread is structural rather than purely political: dense city-cantons
+like Basel-Stadt have a high MFH share where heat pumps face limited outdoor
+space, noise restrictions and difficult ground-source permitting, whereas
+Fribourg's high EFH share makes installation mechanically simpler. The
+spread therefore overstates the pure policy gap; convergence strategies
+must address building-type constraints (notably district heating in dense
+cantons), not only subsidies and MuKEn timing.
 
 This heterogeneity implies that the national-average intensity effect is
 disproportionately driven by early-adopter cantons with high EFH shares,
@@ -875,15 +879,16 @@ while lagging urban cantons represent untapped potential.
 
 === Why intensity dominates
 
-Three reinforcing mechanisms drive the intensity factor's dominance over the 2000--2024 period.
-
-Building standards tightened progressively, lowering new-build heating demand from ~100 kWh/m#super[2]/yr (pre-2000) to less than 40 kWh/m#super[2]/yr under MuKEn 2014 @muken2014. Each new building added to the stock dilutes aggregate intensity downward.
-
-Heat-pump diffusion (seasonal COP 3--4) cut final energy by 60--75% for each unit of floor area switched from fossil boilers @fws2024. The cumulative floor area switched from oil to heat pumps now exceeds 100 million m#super[2].
-
-Behavioural shifts towards lower indoor temperatures, together with improved heating controls (thermostatic radiator valves, building automation), contributed an estimated 10--15% of the total intensity reduction.
-
-These mechanisms are partially correlated: deep renovations typically combine envelope upgrades, system replacement, and improved controls in a single intervention. The aggregate intensity factor captures their joint effect, which is why it dominates the decomposition.
+Three reinforcing mechanisms drive the intensity factor's dominance
+(@sec:intensity quantifies their relative shares): tightening of building
+standards (new-build demand falling from ~100 to under 40 kWh/m#super[2]/yr
+under MuKEn 2014 @muken2014); heat-pump diffusion cutting final energy
+60--75% per m#super[2] switched from fossil boilers @fws2024 (over 100
+million m#super[2] cumulative); and behavioural / control improvements
+contributing an estimated 10--15% of the total intensity reduction. These
+mechanisms are partially correlated --- deep renovations typically bundle
+envelope, system and controls in a single intervention --- which is why
+the aggregate intensity factor captures their joint effect.
 
 === Signs of deceleration
 
@@ -908,22 +913,11 @@ but has moderated to $-2 "," 500$ TJ/year in the 2010s. Early 2020s data suggest
 
 === Absolute decoupling: confirmed but fragile
 
-Switzerland has achieved absolute decoupling between residential
-heating energy and GDP --- robust to weather correction and consistent
-across sub-periods --- but the decoupling is _fragile_: it depends on
-continued intensity improvements that are decelerating (see above).
-We present the full quantitative summary in @conclusion.
-
-#insight[
-  Switzerland has achieved absolute decoupling: heating energy has
-  fallen by 17% while GDP grew by 51% since 2000. However, the
-  rate of improvement is decelerating. Sustaining this trajectory
-  requires doubling the renovation rate (from 1.1% to 2%/year) and
-  unlocking heat-pump adoption in multi-family buildings, which house
-  73% of the population but account for a minority of installations.
-]
-
-The policy implications of these findings are developed in @scenarios.
+Switzerland has achieved absolute decoupling between residential heating
+energy and GDP --- robust to weather correction and consistent across
+sub-periods --- but the decoupling is _fragile_: it depends on continued
+intensity improvements that are decelerating. The policy implications are
+developed in @scenarios.
 
 
 // =============================================================================
@@ -1019,24 +1013,15 @@ Our Monte Carlo exercise produces a _sensitivity envelope_, not a probability fo
 
 === Projection model
 
-Future space-heating energy demand is projected using the same multiplicative identity as the LMDI decomposition:
-
-$ E_t = P_t times "HDD"_t times I_t $
-
-where each factor evolves from its observed 2024 base value. Population $P_t$ follows BFS official projections (reference, high, and low scenarios). Heating degree days $"HDD"_t$ decline at 2.5%/decade, consistent with observed Swiss climate trends. Energy intensity $I_t$ declines at a rate linked to the renovation rate:
-
-$ dot(I) = 0.010 + 0.5 times r $
-
-where $r$ is the annual renovation rate (fraction of building stock renovated per year). The two terms capture distinct mechanisms: the base rate (1%/yr) represents _autonomous_ intensity improvements that occur without envelope renovation --- primarily fuel switching at natural system end-of-life (oil boiler replaced by heat pump) and incremental behavioural/controls gains. The renovation-linked term reflects the stock-level energy saving from deep envelope retrofits: a typical Swiss renovation reduces building-level heating demand by ~50% (from $tilde 150$ to $tilde 75$ kWh/m#super[2]/yr), so renovating $r$ percent of the stock yields an additional $0.5 r$ percent intensity decline at the aggregate level.
-
-This functional form is an engineering approximation, not an empirically calibrated relationship. It assumes uniform renovation depth across the stock and does not capture diminishing returns as the most inefficient buildings are renovated first. These simplifications are acceptable for a scenario-comparison exercise but mean the absolute 2050 values should be interpreted as indicative, not predictive.
+Future space-heating energy demand is projected using the same multiplicative identity as the LMDI decomposition, $E_t = P_t times "HDD"_t times I_t$, with population $P_t$ following BFS scenarios, $"HDD"_t$ declining 2.5%/decade, and intensity following $dot(I) = 0.010 + 0.5 times r$ where $r$ is the annual renovation rate. The base term (1%/yr) captures autonomous intensity gains from end-of-life fuel switching and incremental controls; the renovation-linked term reflects the ~50% building-level heating reduction achieved by deep retrofits, scaled to the stock. The functional form is an engineering approximation, not an empirically calibrated relationship; full derivation, assumptions and limitations are in @app:projmodel.
 
 === Three named scenarios
 
-We define three deterministic scenarios that span the range of plausible
-renovation-rate trajectories. All three hold population at the BFS
-reference projection and HDD decline at the central trend; only the
-renovation rate varies. @tab:mc-params summarises the parameters.
+We define three deterministic scenarios spanning plausible renovation-rate
+trajectories --- BAU (1%/yr, current pace), Accelerated (2%/yr, EP2050+
+target), and Ambitious (3%/yr, upper bound of feasibility) --- all using
+BFS reference population and the central HDD trend. @tab:mc-params
+summarises the parameters.
 
 #figure(
   table(
@@ -1056,11 +1041,9 @@ renovation rate varies. @tab:mc-params summarises the parameters.
   explores the full parameter space.],
 ) <tab:mc-params>
 
-The three scenarios are deterministic: BAU (1%/yr renovation rate, current pace), Accelerated (2%/yr, EP2050+ target), and Ambitious (3%/yr, upper bound of feasibility). All three use BFS reference population and the central HDD trend.
-
 === Sensitivity envelope
 
-To explore parameter uncertainty beyond the three named scenarios, we sample 1,000 parameter combinations: renovation rate uniformly in 0.8--3.2%/yr, population uniformly between BFS low and high projections, and HDD decline normally distributed around 2.5%/decade ($sigma = 1.0$). The resulting trajectories produce a sensitivity envelope (@fig:scenario-fan), _not_ a probability distribution --- the shaded bands represent the range of plausible outcomes given the parameter bounds, without implying that any particular outcome is more likely than another. Future renovation rates and population trajectories are outcomes of policy choices and political decisions, not random variables with a known probability distribution.
+To explore parameter uncertainty beyond the three named scenarios, we sample 1,000 parameter combinations: renovation rate uniformly in 0.8--3.2%/yr, population uniformly between BFS low and high projections, and HDD decline normally distributed around 2.5%/decade ($sigma = 1.0$). The resulting trajectories produce a sensitivity envelope (@fig:scenario-fan).
 
 #figure(
   image("figures/fig12_scenario_fan.svg", width: 100%),
@@ -1208,7 +1191,14 @@ presents the projections alongside key assumptions.
 
 These trajectories are visualised in @fig:scenario-fan, with the Monte Carlo uncertainty envelope, and @fig:tornado quantifying the sensitivity of the 2050 outcome to individual parameter perturbations.
 
-The plausibility of the Accelerated scenario is supported by tightening regulatory requirements. MuKEn 2025, adopted in August 2025, effectively bans fossil heating-system replacements by requiring 100% renewable energy for all new installations, accelerating the oil-to-heat-pump transition at natural system end-of-life (typically 15--20 years). Beyond this event-triggered mechanism, two cantons have introduced performance-based renovation obligations: Geneva requires buildings exceeding 800 MJ/m#super[2]/yr to renovate within three years (in force since June 2024) @ge2024energy, and the Canton of Vaud has adopted a law requiring GEAK F/G buildings above 750 m#super[2] to be renovated by 2042, with entry into force expected in January 2027 @vd2026energy. If other cantons follow this trajectory, renovation rates could rise above the current 1.1%/yr baseline toward the 2%/yr target.
+The Accelerated scenario is supported by tightening regulation: MuKEn
+2025 (adopted August 2025) effectively bans fossil heating replacements
+by requiring 100% renewables for new installations, accelerating the
+oil-to-heat-pump transition at natural end-of-life. Geneva
+@ge2024energy and Vaud @vd2026energy have additionally introduced
+performance-based renovation mandates for the worst-performing buildings.
+If other cantons follow, renovation rates could rise from 1.1%/yr
+towards the 2%/yr target.
 
 === Gap to net-zero
 
@@ -1221,14 +1211,13 @@ MFH turnover prevents convergence.
 
 === Closing the gap: a multi-lever strategy
 
-Reaching the net-zero corridor requires simultaneous action on multiple
-decomposition factors: renovation rates at or above 2.5%/yr @ep2050plus
-(bridging half the gap), accelerated MFH heat-pump deployment
-(closing the 8-pp EFH--MFH gap), floor-area stabilisation (saving an
-estimated 4,000--6,000 TJ by 2050), and complementary pathways for the
-hardest-to-electrify segment (biofuels, district heating, behavioural
-interventions) contributing the final 5,000--10,000 TJ @iea2024. No
-single lever is sufficient.
+Reaching the EP2050+ corridor requires simultaneous action on renovation
+rates ($>=$ 2.5%/yr, bridging half the gap), MFH heat-pump deployment
+(8-pp EFH--MFH gap), floor-area stabilisation (4,000--6,000 TJ by 2050),
+and complementary pathways for the hardest-to-electrify segment
+(biofuels, district heating; 5,000--10,000 TJ @iea2024). No single lever
+suffices; the recommendations in @sec:policy-recs translate this into
+concrete instruments.
 
 
 == Policy Recommendations <sec:policy-recs>
@@ -1274,7 +1263,16 @@ on MuKEn 2014 adoption; and (ii) targeted district-heating expansion in
 dense urban cantons where individual heat pumps face genuine physical
 constraints.
 
-District heating deserves particular emphasis as the primary decarbonisation pathway for dense urban cantons like Basel-Stadt and Geneva, where individual heat-pump installations face space, noise, and drilling constraints that are structural rather than regulatory. District heating networks can draw on a diverse mix of heat sources --- waste incineration plants (already a major source in Swiss cities), large-scale centralised heat pumps (river- or lake-water sourced), deep geothermal, and wood-chip boilers --- achieving decarbonisation at the neighbourhood scale without requiring individual building interventions. Several Swiss cities are already operating or expanding district heating networks: Geneva's GeniLac project uses Lake Geneva water, Zurich is extending its _Fernwärme_ network, and Basel has pioneered deep geothermal. District heating is complementary to, not competing with, heat-pump expansion: it serves precisely the dense urban segments where individual heat pumps are least feasible, while heat pumps remain the optimal solution for suburban and rural EFH stock.
+District heating is the primary decarbonisation pathway for dense urban
+cantons (Basel-Stadt, Geneva) where individual heat pumps face structural
+space, noise, and drilling constraints. Networks can draw on waste
+incineration, large lake- or river-source heat pumps, deep geothermal,
+and wood-chip boilers, decarbonising at the neighbourhood scale without
+individual interventions. Examples already operating or expanding include
+Geneva's GeniLac (Lake Geneva), Zurich's _Fernwärme_ network and Basel's
+deep geothermal pilot. The two technologies are complementary --- district
+heating for dense urban segments, individual heat pumps for suburban and
+rural EFH stock.
 
 === Recommendation 4: Floor-area efficiency signal
 
@@ -1576,6 +1574,45 @@ using Python (Polars for tabular data, Plotly for visualisation).
   ),
   caption: [CO#sub[2] levy scenarios used in the TOTEX comparison. The 120/200/300 CHF/t progression spans from current law through the most likely near-term policy path to the theoretically optimal tax internalising the full climate-damage externality.],
 ) <tab:co2-scenarios>
+
+= Projection Model — Derivation and Limitations <app:projmodel>
+
+Future space-heating energy demand is projected using the same
+multiplicative identity as the LMDI decomposition:
+
+$ E_t = P_t times "HDD"_t times I_t $
+
+where each factor evolves from its observed 2024 base value. Population
+$P_t$ follows BFS official projections (reference, high, and low
+scenarios). Heating degree days $"HDD"_t$ decline at 2.5%/decade,
+consistent with observed Swiss climate trends. Energy intensity $I_t$
+declines at a rate linked to the renovation rate:
+
+$ dot(I) = 0.010 + 0.5 times r $
+
+where $r$ is the annual renovation rate (fraction of building stock
+renovated per year). The two terms capture distinct mechanisms: the base
+rate (1%/yr) represents _autonomous_ intensity improvements that occur
+without envelope renovation --- primarily fuel switching at natural
+system end-of-life (oil boiler replaced by heat pump) and incremental
+behavioural/controls gains. The renovation-linked term reflects the
+stock-level energy saving from deep envelope retrofits: a typical Swiss
+renovation reduces building-level heating demand by ~50% (from
+$tilde 150$ to $tilde 75$ kWh/m#super[2]/yr), so renovating $r$ percent
+of the stock yields an additional $0.5 r$ percent intensity decline at
+the aggregate level.
+
+This functional form is an engineering approximation, not an empirically
+calibrated relationship. It assumes uniform renovation depth across the
+stock and does not capture diminishing returns as the most inefficient
+buildings are renovated first. These simplifications are acceptable for
+a scenario-comparison exercise but mean the absolute 2050 values should
+be interpreted as indicative, not predictive. The Monte-Carlo input
+distributions (uniform for renovation rate and population, normal for
+HDD decline) bound the range of _plausible_ values, not calibrated
+probability densities; future renovation rates and population
+trajectories are outcomes of policy choices, not random variables with a
+known distribution.
 
 = Data Quality and Limitations — Detail <app:dataquality>
 
