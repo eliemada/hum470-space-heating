@@ -266,6 +266,7 @@
   }
 
   // === FRONT MATTER (Roman numerals) ===
+  set page(numbering: "i")
   counter(page).update(1)
   page-fmt.update("i")
 
@@ -309,6 +310,7 @@
   }
 
   // === BODY (Arabic numerals, restart at 1) ===
+  set page(numbering: "1")
   counter(page).update(1)
   page-fmt.update("1")
   body
