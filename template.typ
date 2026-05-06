@@ -12,6 +12,10 @@
 #let light-gray = rgb("#F5F5F5")
 #let medium-gray = rgb("#E0E0E0")
 
+// Page numbering format: "i" (lowercase Roman) for front matter,
+// "1" (Arabic with total) for body. Updated mid-document via state.
+#let page-fmt = state("page-fmt", "i")
+
 #let report(
   title: "",
   subtitle: "",
@@ -55,11 +59,18 @@
       set text(size: 8.5pt, fill: accent-gray)
       line(length: 100%, stroke: 0.4pt + medium-gray)
       v(2pt)
+      let fmt = page-fmt.get()
+      let n = counter(page).at(here()).first()
+      let display-str = if fmt == "1" {
+        [#n / #counter(page).final().first()]
+      } else {
+        numbering(fmt, n)
+      }
       grid(
         columns: (1fr, 1fr),
         align: (left, right),
         [#semester],
-        [#counter(page).display("1 / 1", both: true)],
+        display-str,
       )
     },
   )
@@ -254,6 +265,10 @@
     pagebreak()
   }
 
+  // === FRONT MATTER (Roman numerals) ===
+  counter(page).update(1)
+  page-fmt.update("i")
+
   // === ABSTRACT (optional) ===
   if abstract != none {
     v(1em)
@@ -293,7 +308,9 @@
     pagebreak()
   }
 
-  // === BODY ===
+  // === BODY (Arabic numerals, restart at 1) ===
+  counter(page).update(1)
+  page-fmt.update("1")
   body
 }
 
