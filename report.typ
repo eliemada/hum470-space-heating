@@ -25,7 +25,11 @@
     This report presents a four-factor LMDI-I decomposition of final energy
     demand for space heating in Swiss residential buildings over 2000--2024.
     We decompose total heating energy into population, floor area per capita,
-    climate (heating degree days), and energy intensity. Despite population
+    climate (heating degree days), and energy intensity. The novelty of this
+    work lies in combining (A) the first formal LMDI-I decomposition published
+    for Swiss residential space heating with (B) a Monte-Carlo sensitivity
+    envelope of 2050 projections, linked to a CO#sub[2]-levy TOTEX comparison
+    and cantonal/building-type heterogeneity analysis. Despite population
     growth (+25%) and expanding per-capita floor area (+38%), space-heating
     energy declined by 17% --- confirming absolute decoupling from GDP (+51%).
     The intensity factor ($-67 "," 366$ TJ) dominates, driven by
@@ -137,6 +141,18 @@ decomposing 2000--2024 demand into four factors (population, floor
 area per capita, climate, and energy intensity), quantifying their
 relative contributions, and identifying the policy levers most likely
 to sustain the observed decoupling trajectory.
+
+*Novelty.* The contribution of this report is the integration of two
+elements that, to our knowledge, have not previously been combined for
+this sector: (A) a formal four-factor LMDI-I decomposition of Swiss
+residential space-heating demand over 2000--2024, and (B) a Monte-Carlo
+sensitivity envelope of 2050 projections linked to a CO#sub[2]-levy TOTEX
+comparison and cantonal/building-type heterogeneity analysis. Element
+(A) provides the historical attribution layer; element (B) translates
+that attribution into a forward-looking, policy-relevant uncertainty
+ranking. Their combination is what allows the report to identify the
+specific levers (renovation rate, MFH heat-pump unlock, floor-area
+restraint) most likely to sustain decoupling.
 
 Our central research question is: *Has the improvement in energy
 intensity been sufficient to achieve absolute decoupling of residential
@@ -259,22 +275,13 @@ provide the benchmark against which our forward-looking analysis in
 
 = Key Concepts and Decomposition Framework <framework>
 
-== Key Definitions
-
-#definition[Final energy demand for space heating][
-  The total energy consumed by residential buildings for the purpose of space
-  heating, measured at the point of final use. This includes fossil fuels
-  (heating oil, natural gas), electricity (heat pumps, direct electric
-  heating), biomass (wood, pellets), and district heating, but excludes
-  transformation and distribution losses upstream.
-]
-
-#definition[Heating degree days (HDD)][
-  A weather-based index measuring the cumulative difference between a base
-  temperature (typically 20 °C in Switzerland) and the daily mean outdoor
-  temperature over the heating season. Higher HDD values indicate colder
-  winters and greater heating demand.
-]
+Throughout this report, _final energy demand for space heating_ refers to
+the total energy consumed by residential buildings for space-heating at the
+point of final use (fossil fuels, electricity, biomass, district heating;
+transformation and upstream distribution losses excluded), and _heating
+degree days_ (HDD) denote the cumulative difference between a 20 °C base
+temperature and the daily mean outdoor temperature over the heating season.
+Formal definitions are listed in @app:definitions.
 
 == Adapted Kaya Identity
 
@@ -299,24 +306,15 @@ engineering estimates.
 
 == Mapping to the IPAT Framework
 
-#figure(
-  table(
-    columns: (auto, auto, 1fr),
-    align: (center, center, left),
-    table.header(
-      [*Factor*], [*IPAT category*], [*Interpretation*],
-    ),
-    table.hline(stroke: 0.8pt),
-    [$P$], [Population], [Demographic scale --- immigration-driven growth],
-    [$A slash P$], [Affluence], [Per-capita floor area --- living-space standards],
-    [$H$], [--- (Climate)], [Heating degree days --- exogenous weather exposure],
-    [$I = E slash (A times H)$], [Technology], [Energy intensity --- envelope quality, system efficiency, behaviour],
-    table.hline(stroke: 0.8pt),
-  ),
-  caption: [Mapping of decomposition factors to the IPAT framework.],
-) <tab:ipat-mapping>
-
-Note that the theoretical 6-factor decomposition (population $times$ dwellings/capita $times$ area/dwelling $times$ system shares $times$ system efficiencies) is collapsed into four observable factors to match available annual data. The intensity factor $I$ implicitly captures both heating-system mix and building-envelope quality.
+The four decomposition factors map onto the IPAT framework as follows:
+$P$ corresponds to _Population_ (immigration-driven demographic scale),
+$A slash P$ to _Affluence_ (per-capita living-space standards), $I$ to
+_Technology_ (envelope quality, system efficiency and behaviour), and
+$H$ enters as an exogenous climate driver outside the original IPAT
+triplet. The full mapping table is provided in @app:ipat. The
+theoretical 6-factor decomposition (population $times$ dwellings/capita
+$times$ area/dwelling $times$ system shares $times$ system efficiencies)
+is collapsed into four observable factors to match available annual data.
 
 
 // =============================================================================
@@ -325,49 +323,13 @@ Note that the theoretical 6-factor decomposition (population $times$ dwellings/c
 
 = Possible Main Drivers <drivers>
 
-Based on the decomposition framework and literature, we identify the following
-potential drivers of residential heating energy demand in Switzerland:
-
-#figure(
-  table(
-    columns: (auto, 1fr, auto),
-    align: (left, left, center),
-    table.header(
-      [*Driver*], [*Mechanism*], [*Expected effect*],
-    ),
-    table.hline(stroke: 0.8pt),
-    [Population growth ($P$)],
-    [More residents require more heated dwellings],
-    [$+$],
-
-    [Dwelling density ($D slash P$)],
-    [Trend towards smaller households increases dwellings per capita],
-    [$+$],
-
-    [Floor area per dwelling ($A slash D$)],
-    [Rising affluence drives demand for larger living spaces],
-    [$+$],
-
-    [Heating-system mix ($S_s$)],
-    [Shift from oil/gas to heat pumps reduces final energy per m#super[2]],
-    [$-$],
-
-    [Building-envelope quality],
-    [Insulation retrofits and new building standards (MuKEn) reduce heat losses],
-    [$-$],
-
-    [Climate (HDD)],
-    [Warmer winters reduce heating demand; cold spells increase it],
-    [$+/-$],
-
-    [Occupant behaviour],
-    [Thermostat settings, ventilation habits, rebound effects],
-    [$+/-$],
-    table.hline(stroke: 0.8pt),
-  ),
-  caption: [Summary of potential drivers and their expected directional effect
-  on residential heating energy demand.],
-) <tab:drivers>
+Drawing on the decomposition framework and the literature, seven candidate
+drivers shape residential space-heating demand in Switzerland: population
+growth, dwelling density, floor area per dwelling, heating-system mix,
+building-envelope quality, climate (HDD), and occupant behaviour. The
+first three exert upward pressure, the next two are unambiguously downward,
+and the last two are direction-ambiguous. @app:drivers tabulates each
+driver, its mechanism, and its expected directional effect.
 
 In our four-factor LMDI, dwelling density ($D slash P$) and floor area per dwelling ($A slash D$) are merged into floor area per capita ($A slash P = D slash P times A slash D$), while heating-system mix ($S_s$), building-envelope quality, and occupant behaviour are absorbed into the intensity factor ($I$). This aggregation sacrifices granularity for data reliability: $A slash P$ and $I$ can be computed from consistent annual time series, whereas the sub-components would require building-stock model estimates.
 
@@ -394,52 +356,18 @@ alter the balance between upward and downward pressures through 2050.
 
 == Data Sources
 
-Our analysis draws on the following primary data sources. All datasets were
-downloaded programmatically, cached locally, and processed using Python
-(Polars for tabular data, Plotly for visualisation).
-
-#datasource("BFE — Overall Energy Statistics")[
-  _Schweizerische Gesamtenergiestatistik_: final energy consumption by
-  sector and carrier, 1980--2024. We filter for _Endverbrauch -- Haushalte_
-  to obtain residential heating energy @bfe2024.
-]
-
-#datasource("BFE/Prognos — Energy Consumption by End Use")[
-  _Analyse des schweizerischen Energieverbrauchs 2000--2023 nach
-  Verwendungszwecken_ @prognos2024. Tabelle 1: space-heating share of
-  household energy. Tabelle 11: heating energy by carrier (PJ).
-  Tabelle 13: floor-area shares by heating system.
-]
-
-#datasource("BFE — Heating Degree Days")[
-  Population-weighted national HDD (base 20/12 °C), monthly from 1994.
-  Pre-1994 supplemented by Zurich-Fluntern station data from Stadt Zürich
-  Open Data @meteoswiss2024.
-]
-
-#datasource("BFS — Population (STATPOP)")[
-  Permanent resident population 2010--2024 via PX-Web API @bfs2024.
-  Extended to 1960 using World Bank WDI @worldbank2024. BFS scenarios
-  (reference/high/low) for 2025--2075 projections @bfs2024pop.
-]
-
-#datasource("BFS — Building and Dwelling Register (GWR)")[
-  _Gebäude- und Wohnungsstatistik_ via SDMX REST API @sdmx2024:
-  buildings by heating system, building category (EFH/MFH/mixed/partial),
-  construction period, and canton. Annual data 2021--2024 @bfs2024.
-  Floor area per person by building type and construction period.
-]
-
-#datasource("World Bank — World Development Indicators")[
-  GDP in constant LCU (indicator NY.GDP.MKTP.KN) for Switzerland,
-  2000--2024. Population (SP.POP.TOTL) 1960--2024 @worldbank2024.
-]
-
-#datasource("Geospatial — Swiss canton boundaries")[
-  TopoJSON canton boundaries from _swiss-maps_ @swissmaps2021, based on
-  BFS/GEOSTAT. 26 cantons with BFS canton IDs (1--26), converted to
-  GeoJSON for Plotly choropleth rendering.
-]
+The analysis draws on seven primary data sources, downloaded programmatically
+and processed in Python (Polars, Plotly): residential energy consumption
+from the BFE _Gesamtenergiestatistik_ @bfe2024 and the BFE/Prognos end-use
+analysis @prognos2024; population-weighted national heating degree days
+from BFE @meteoswiss2024; permanent resident population and BFS projection
+scenarios @bfs2024 @bfs2024pop, extended pre-2010 with World Bank WDI
+@worldbank2024; the BFS Building and Dwelling Register (GWR) for
+heating-system, building-type and cantonal disaggregation @sdmx2024;
+World Bank GDP in constant local currency @worldbank2024; and TopoJSON
+canton boundaries for geospatial visualisation @swissmaps2021. Detailed
+source descriptions, accession dates, and table identifiers are provided
+in @app:datasources.
 
 == Methodology
 
@@ -462,29 +390,16 @@ analytical pipeline, from data sources through decomposition to outputs.
 
 == Data Quality and Limitations
 
-- *Floor area time series*: BFS floor-area-per-person data is only
-  available from 2012. For the 2000--2011 period, we use linear
-  back-extrapolation anchored to known stock estimates.
-
-- *HDD composite series*: The national series (BFE, 1994+) and the
-  Zurich-Fluntern series (pre-1994) use different measurement
-  methodologies. We validate the overlap period and find close agreement
-  (within 3%).
-
-- *GWR coverage*: The SDMX API provides building-level data only from
-  2021. For earlier years, we rely on BFS census snapshots (2000, 2021).
-
-- *EBF definition break*: The _Energiebezugsfläche_ definition changed
-  with SIA 380/1 revision in 2007. This precludes using per-m#super[2]
-  metrics as a formal LMDI factor (see @sec:intensity for discussion).
-
-- *Intensity attribution*: The sub-decomposition of the intensity effect
-  into envelope, fuel-switching, and behavioural components is an
-  engineering-based attribution distinct from the LMDI framework, relying
-  on stock-turnover estimates from @prognos2024, @tep2023, and @kaempf2018
-  rather than a formal statistical decomposition. The resulting shares
-  carry uncertainty of $plus.minus 10$ percentage points
-  because the three mechanisms interact (see @sec:intensity).
+Five data limitations shape the analysis: BFS floor-area-per-person data
+begin only in 2012 (back-extrapolated to 2000); the HDD series splices a
+national 1994+ record with pre-1994 Zurich-Fluntern data; GWR
+building-level data are reliable only from 2021; the SIA 380/1 _EBF_
+definition changed in 2007, breaking per-m#super[2] continuity and
+precluding it as a formal LMDI factor; and the intensity sub-attribution
+into envelope, fuel-switching and behavioural components is an
+engineering decomposition with $plus.minus 10$ pp uncertainty rather
+than a statistical one. Full descriptions, validation checks and
+mitigation strategies are in @app:dataquality.
 
 
 // =============================================================================
@@ -1055,33 +970,11 @@ serve as both an information instrument and a trigger for renovation subsidies.
 
 To assess how the evolving carbon-pricing landscape affects the economics of
 heating-system choice, we evaluate annual total cost of ownership (TOTEX)
-under three CO#sub[2] levy scenarios. These span the range from current
-policy reality to the theoretical optimum that would fully internalise the
-climate externality.
-
-#figure(
-  table(
-    columns: (auto, auto, 1fr),
-    align: (left, center, left),
-    table.header(
-      [*Scenario*], [*Rate (CHF/t)*], [*Justification*],
-    ),
-    table.hline(stroke: 0.8pt),
-    [Status quo],
-    [120],
-    [Current rate since 1 Jan 2022. Set by CO#sub[2] Act (SR 641.71) and Ordinance (SR 641.711, Art. 94a). The levy has escalated stepwise from CHF 12/t in 2008.],
-
-    [Policy trajectory],
-    [200],
-    [Revised CO#sub[2] Act 2025--2030 ceiling of CHF 210/t @co2act. Consistent with the EU ETS trajectory under Fit-for-55 and BFE _EP2050+_ @ep2050plus.],
-
-    [Full externality],
-    [300],
-    [Aligns with IPCC AR6 WGIII 1.5°C-pathway median social cost of carbon @ipcc2023. Supported by @rennert2022 and @epa2023 SCC estimates (USD 185--220/t CO#sub[2]).],
-    table.hline(stroke: 0.8pt),
-  ),
-  caption: [CO#sub[2] levy scenarios used in the TOTEX comparison. The 120/200/300 CHF/t progression spans from current law through the most likely near-term policy path to the theoretically optimal tax internalising the full climate-damage externality.],
-) <tab:co2-scenarios>
+under three CO#sub[2] levy scenarios spanning current policy reality to the
+theoretical externality optimum: *CHF 120/t* (status quo, in force since
+1 Jan 2022 @co2act), *CHF 200/t* (revised CO#sub[2] Act 2025--2030 ceiling,
+EU ETS-aligned @ep2050plus) and *CHF 300/t* (IPCC AR6 1.5°C social-cost-of-carbon
+median @ipcc2023 @rennert2022). Full justification is in @app:co2scenarios.
 
 @fig:cost-comparison presents the annual TOTEX for a reference 150 m#super[2]
 unrenovated house (120 kWh/m#super[2]/yr) across four heating systems and
@@ -1462,6 +1355,17 @@ corridor ($-60$ to $-70%$). Closing this gap requires simultaneous action
 on renovation rates, MFH electrification, floor-area restraint, and
 complementary decarbonisation pathways.
 
+*Realising the novelty.* These findings rest on the combined methodology
+laid out at the outset: the four-factor LMDI-I decomposition (element A)
+delivers the historical attribution that exposes the affluence blind
+spot and the deceleration of intensity gains, while the Monte-Carlo
+sensitivity envelope on 2050 projections (element B) ranks the renovation
+rate as the dominant policy lever (3--6$times$ more variance-explanatory
+than population or HDD) and quantifies the gap to the EP2050+ corridor.
+Neither element alone could have produced the policy ranking; their
+integration is what links the 2000--2024 decomposition to actionable
+2050 levers.
+
 
 == General Lessons <sec:general-lessons>
 
@@ -1512,12 +1416,189 @@ building-stock modelling would all strengthen the analysis.
 
 
 // =============================================================================
-// APPENDIX (optional)
+// APPENDIX
 // =============================================================================
 
-// #pagebreak()
-// #heading(numbering: none)[Appendix]
-//
-// == A.1 Detailed Data Tables
-// == A.2 Decomposition Calculations
-// == A.3 Sensitivity Analysis
+#pagebreak()
+
+#set heading(numbering: "A.1")
+#counter(heading).update(0)
+
+= Key Definitions <app:definitions>
+
+#definition[Final energy demand for space heating][
+  The total energy consumed by residential buildings for the purpose of space
+  heating, measured at the point of final use. This includes fossil fuels
+  (heating oil, natural gas), electricity (heat pumps, direct electric
+  heating), biomass (wood, pellets), and district heating, but excludes
+  transformation and distribution losses upstream.
+]
+
+#definition[Heating degree days (HDD)][
+  A weather-based index measuring the cumulative difference between a base
+  temperature (typically 20 °C in Switzerland) and the daily mean outdoor
+  temperature over the heating season. Higher HDD values indicate colder
+  winters and greater heating demand.
+]
+
+= IPAT Framework Mapping <app:ipat>
+
+#figure(
+  table(
+    columns: (auto, auto, 1fr),
+    align: (center, center, left),
+    table.header(
+      [*Factor*], [*IPAT category*], [*Interpretation*],
+    ),
+    table.hline(stroke: 0.8pt),
+    [$P$], [Population], [Demographic scale --- immigration-driven growth],
+    [$A slash P$], [Affluence], [Per-capita floor area --- living-space standards],
+    [$H$], [--- (Climate)], [Heating degree days --- exogenous weather exposure],
+    [$I = E slash (A times H)$], [Technology], [Energy intensity --- envelope quality, system efficiency, behaviour],
+    table.hline(stroke: 0.8pt),
+  ),
+  caption: [Mapping of decomposition factors to the IPAT framework.],
+) <tab:ipat-mapping>
+
+= Possible Main Drivers — Detailed Table <app:drivers>
+
+#figure(
+  table(
+    columns: (auto, 1fr, auto),
+    align: (left, left, center),
+    table.header(
+      [*Driver*], [*Mechanism*], [*Expected effect*],
+    ),
+    table.hline(stroke: 0.8pt),
+    [Population growth ($P$)],
+    [More residents require more heated dwellings],
+    [$+$],
+
+    [Dwelling density ($D slash P$)],
+    [Trend towards smaller households increases dwellings per capita],
+    [$+$],
+
+    [Floor area per dwelling ($A slash D$)],
+    [Rising affluence drives demand for larger living spaces],
+    [$+$],
+
+    [Heating-system mix ($S_s$)],
+    [Shift from oil/gas to heat pumps reduces final energy per m#super[2]],
+    [$-$],
+
+    [Building-envelope quality],
+    [Insulation retrofits and new building standards (MuKEn) reduce heat losses],
+    [$-$],
+
+    [Climate (HDD)],
+    [Warmer winters reduce heating demand; cold spells increase it],
+    [$+/-$],
+
+    [Occupant behaviour],
+    [Thermostat settings, ventilation habits, rebound effects],
+    [$+/-$],
+    table.hline(stroke: 0.8pt),
+  ),
+  caption: [Summary of potential drivers and their expected directional effect
+  on residential heating energy demand.],
+) <tab:drivers>
+
+= Detailed Data Sources <app:datasources>
+
+All datasets were downloaded programmatically, cached locally, and processed
+using Python (Polars for tabular data, Plotly for visualisation).
+
+#datasource("BFE — Overall Energy Statistics")[
+  _Schweizerische Gesamtenergiestatistik_: final energy consumption by
+  sector and carrier, 1980--2024. We filter for _Endverbrauch -- Haushalte_
+  to obtain residential heating energy @bfe2024.
+]
+
+#datasource("BFE/Prognos — Energy Consumption by End Use")[
+  _Analyse des schweizerischen Energieverbrauchs 2000--2023 nach
+  Verwendungszwecken_ @prognos2024. Tabelle 1: space-heating share of
+  household energy. Tabelle 11: heating energy by carrier (PJ).
+  Tabelle 13: floor-area shares by heating system.
+]
+
+#datasource("BFE — Heating Degree Days")[
+  Population-weighted national HDD (base 20/12 °C), monthly from 1994.
+  Pre-1994 supplemented by Zurich-Fluntern station data from Stadt Zürich
+  Open Data @meteoswiss2024.
+]
+
+#datasource("BFS — Population (STATPOP)")[
+  Permanent resident population 2010--2024 via PX-Web API @bfs2024.
+  Extended to 1960 using World Bank WDI @worldbank2024. BFS scenarios
+  (reference/high/low) for 2025--2075 projections @bfs2024pop.
+]
+
+#datasource("BFS — Building and Dwelling Register (GWR)")[
+  _Gebäude- und Wohnungsstatistik_ via SDMX REST API @sdmx2024:
+  buildings by heating system, building category (EFH/MFH/mixed/partial),
+  construction period, and canton. Annual data 2021--2024 @bfs2024.
+  Floor area per person by building type and construction period.
+]
+
+#datasource("World Bank — World Development Indicators")[
+  GDP in constant LCU (indicator NY.GDP.MKTP.KN) for Switzerland,
+  2000--2024. Population (SP.POP.TOTL) 1960--2024 @worldbank2024.
+]
+
+#datasource("Geospatial — Swiss canton boundaries")[
+  TopoJSON canton boundaries from _swiss-maps_ @swissmaps2021, based on
+  BFS/GEOSTAT. 26 cantons with BFS canton IDs (1--26), converted to
+  GeoJSON for Plotly choropleth rendering.
+]
+
+= CO#sub[2] Levy Scenario Justification <app:co2scenarios>
+
+#figure(
+  table(
+    columns: (auto, auto, 1fr),
+    align: (left, center, left),
+    table.header(
+      [*Scenario*], [*Rate (CHF/t)*], [*Justification*],
+    ),
+    table.hline(stroke: 0.8pt),
+    [Status quo],
+    [120],
+    [Current rate since 1 Jan 2022. Set by CO#sub[2] Act (SR 641.71) and Ordinance (SR 641.711, Art. 94a). The levy has escalated stepwise from CHF 12/t in 2008.],
+
+    [Policy trajectory],
+    [200],
+    [Revised CO#sub[2] Act 2025--2030 ceiling of CHF 210/t @co2act. Consistent with the EU ETS trajectory under Fit-for-55 and BFE _EP2050+_ @ep2050plus.],
+
+    [Full externality],
+    [300],
+    [Aligns with IPCC AR6 WGIII 1.5°C-pathway median social cost of carbon @ipcc2023. Supported by @rennert2022 and @epa2023 SCC estimates (USD 185--220/t CO#sub[2]).],
+    table.hline(stroke: 0.8pt),
+  ),
+  caption: [CO#sub[2] levy scenarios used in the TOTEX comparison. The 120/200/300 CHF/t progression spans from current law through the most likely near-term policy path to the theoretically optimal tax internalising the full climate-damage externality.],
+) <tab:co2-scenarios>
+
+= Data Quality and Limitations — Detail <app:dataquality>
+
+- *Floor area time series*: BFS floor-area-per-person data is only
+  available from 2012. For the 2000--2011 period, we use linear
+  back-extrapolation anchored to known stock estimates.
+
+- *HDD composite series*: The national series (BFE, 1994+) and the
+  Zurich-Fluntern series (pre-1994) use different measurement
+  methodologies. We validate the overlap period and find close agreement
+  (within 3%).
+
+- *GWR coverage*: The SDMX API provides building-level data only from
+  2021. For earlier years, we rely on BFS census snapshots (2000, 2021).
+
+- *EBF definition break*: The _Energiebezugsfläche_ definition changed
+  with SIA 380/1 revision in 2007. This precludes using per-m#super[2]
+  metrics as a formal LMDI factor (see @sec:intensity for discussion).
+
+- *Intensity attribution*: The sub-decomposition of the intensity effect
+  into envelope, fuel-switching, and behavioural components is an
+  engineering-based attribution distinct from the LMDI framework, relying
+  on stock-turnover estimates from @prognos2024, @tep2023, and @kaempf2018
+  rather than a formal statistical decomposition. The resulting shares
+  carry uncertainty of $plus.minus 10$ percentage points
+  because the three mechanisms interact (see @sec:intensity).
